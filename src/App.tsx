@@ -1,5058 +1,1842 @@
-import { useState, useEffect, useRef, createContext, useContext } from 'react';
-import {
-  LayoutDashboard,
-  FileSearch,
-  Radio,
-  Scale,
-  Send,
-  ClipboardCheck,
-  Camera,
-  Mic,
-  FileText,
-  AlertTriangle,
-  ShieldAlert,
-  CheckCircle2,
-  Clock,
-  MapPin,
-  ChevronRight,
-  ChevronLeft,
-  ChevronDown,
-  Activity,
-  AlertCircle,
-  Building2,
-  User,
-  Calendar,
-  Bell,
-  Lock,
-  Wifi,
-  WifiOff,
-  PenLine,
-  Mail,
-  Printer,
-  FileCheck,
-  Sparkles,
-  Eye,
-  Edit3,
-  CircleDot,
-  ArrowRight,
-  Stamp,
-  Hash,
-  Briefcase,
-  BarChart3,
-  Users,
-  ShieldCheck,
-  Award,
-  Zap,
-  LogOut,
-  Settings,
-  UserPlus,
-  Search,
-  Globe,
-  ArrowUp,
-  Network,
-  Trophy,
-  Gauge,
-  X,
-  Check,
-  Menu,
-  Download,
-  Pause,
-  Play,
-  Square,
-  Bot,
-  MessageSquarePlus,
-} from 'lucide-react';
-import {
-  LineChart,
-  Line,
-  BarChart,
-  Bar,
-  AreaChart,
-  Area,
-  PieChart,
-  Pie,
-  Cell,
-  RadarChart,
-  Radar,
-  PolarGrid,
-  PolarAngleAxis,
-  PolarRadiusAxis,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  Legend,
-} from 'recharts';
+import { useState, useRef, useEffect, useCallback } from 'react';
+import { Send, FileText, CheckCircle, Loader2, Download, AlertCircle, Sparkles, Edit3, Save, ArrowLeft, Trash2, AlertTriangle, ShieldCheck, Info, HelpCircle, Clock, MessageSquarePlus, X, Globe } from 'lucide-react';
 
-const C = {
-  darkest: '#460073',
-  dark: '#7500C0',
-  core: '#A100FF',
-  light: '#C2A3FF',
-  lightest: '#E6DCFF',
-};
-const FONT =
-  "'Graphik', 'Graphik Web', 'Inter', system-ui, -apple-system, sans-serif";
+// =============================================================================
+// LSB REPORT DRAFTER
+//
+// Features:
+//   • Generation timer + post-download toast
+//   • Session timer in footer
+//   • New Chat button — resets all state and clears the conversation
+//   • Bilingual EN/JA — top-right toggle switches both UI and agent output
+//     - UI labels translated via local dictionary
+//     - Agent output (report content, MCQs, verification items) generated
+//       in target language via prompt instruction
+//     - Structural markers (DOCUMENT, HEADERS, SEVERITY, etc.) stay English
+//       so the parser remains robust across languages
+//     - DOCX uses a Japanese seal stamp when language=ja
+// =============================================================================
 
-const LANGUAGES = [
-  { code: 'en', native: 'English', label: 'English' },
-  { code: 'ja', native: '日本語', label: 'Japanese' },
-  { code: 'zh', native: '中文', label: 'Chinese' },
-  { code: 'ko', native: '한국어', label: 'Korean' },
-  { code: 'vi', native: 'Tiếng Việt', label: 'Vietnamese' },
-];
+type AnyFn = (...args: unknown[]) => unknown;
+type AnyObj = { [key: string]: unknown };
 
-const TR = {
-  signIn: 'Sign in',
-  signInSecurely: 'Sign in securely',
-  authPersonnel: 'Authorized personnel only',
-  inspector: 'Inspector',
-  administrator: 'Administrator',
-  badgeId: 'Badge ID',
-  password: 'Password',
-  forgotPwd: 'Forgot password?',
-  rememberDev: 'Remember device 30 days',
-  demoCreds: 'Demo credentials',
-  platform: 'Inspection Intelligence Platform',
-  platformDesc:
-    'Multimodal AI decision support for end-to-end labour standards enforcement.',
-  caseQueue: 'Case Queue',
-  allCases: 'All cases',
-  preInspBriefing: 'Pre-Inspection Briefing',
-  planning: 'Planning',
-  liveInspection: 'Live Inspection',
-  onSite: 'On-site',
-  violationReview: 'Violation Review',
-  enforcement: 'Enforcement',
-  documentIssuance: 'Document Issuance',
-  delivery: 'Delivery',
-  followUpClosure: 'Follow-Up & Closure',
-  verification: 'Verification',
-  analytics: 'Analytics',
-  insights: 'Insights',
-  profile: 'Profile',
-  myAccount: 'My account',
-  officeOverview: 'Office Overview',
-  dashboard: 'Dashboard',
-  approvals: 'Approvals',
-  criminalRef: 'Criminal referrals',
-  inspRoster: 'Inspector Roster',
-  manageTeam: 'Manage team',
-  regAnalytics: 'Regional Analytics',
-  performance: 'Performance',
-  approve: 'Approve',
-  reject: 'Reject',
-  confirm: 'Confirm',
-  cancel: 'Cancel',
-  edit: 'Edit',
-  view: 'View',
-  back: 'Back',
-  viewReport: 'View Report',
-  approveAndSign: 'Approve & Sign',
-  approved: 'Approved',
-  rejected: 'Rejected',
-  download: 'Download',
-  print: 'Print',
-  search: 'Search',
-  active: 'Active',
-  onLeave: 'On leave',
-  pending: 'Pending',
-  draft: 'Draft',
-  online: 'Online',
-  offline: 'Offline',
-  case: 'Case',
-  save: 'Save',
-  cancelEdit: 'Cancel edit',
-  goodMorning: 'Good morning',
-  todayInsp: "Today's Inspections",
-  pendingCorr: 'Pending Corrections',
-  overdueRpt: 'Overdue Reports',
-  reInspDue: 'Re-Inspections Due',
-  dailyPlan: 'Daily Plan',
-  apprByChief: 'Approved by Chief',
-  todaysCases: "Today's Cases",
-  highPri: 'HIGH PRIORITY',
-  medPri: 'MEDIUM PRIORITY',
-  lowPri: 'LOW PRIORITY',
-  upNext: 'Up next',
-  openBriefing: 'Open Briefing',
-  riskScore: 'Risk Score',
-  industry: 'Industry',
-  workers: 'Workers',
-  trigger: 'Trigger',
-  lastInsp: 'Last inspection',
-  aiBriefing: 'AI Briefing Pack',
-  syncedOff: 'Synced offline',
-  entProfile: 'Enterprise Profile',
-  prevViol: 'Previous Violation History',
-  repeatRisk: 'Repeat risk',
-  industryRegs: 'Industry Regulations',
-  suggQs: 'Suggested Questions',
-  aiGen: 'AI generated',
-  recTiming: 'Recommended Timing',
-  beginInsp: 'Begin Inspection',
-  evidCapture: 'Evidence Capture',
-  aiAssist: 'AI-assisted',
-  scanDoc: 'Scan Document',
-  voiceNote: 'Voice Note',
-  photoWp: 'Photo / Video: Workplace',
-  capturedEv: 'Captured Evidence',
-  detViol: 'Detected Violations',
-  rtAlerts: 'Real-Time Alerts',
-  recording: 'RECORDING',
-  noEvid: 'No evidence captured yet',
-  noViol: 'No violations detected yet',
-  waitCap: 'Waiting for capture...',
-  alerts: 'alerts',
-  completeProc: 'Complete & Proceed',
-  decMatrix: 'Decision Matrix',
-  draftDocs: 'Draft Enforcement Documents',
-  genaiDr: 'GenAI auto-drafted',
-  procIssue: 'Proceed to Issuance',
-  awaitRev: 'Awaiting review',
-  issuedOnSite: 'Issued on-site',
-  article: 'Article',
-  violation: 'Violation',
-  severity: 'Severity',
-  recAct: 'Recommended Action',
-  deadline: 'Deadline',
-  status: 'Status',
-  finDocs: 'Finalize & Deliver Documents',
-  docsToDel: 'Documents to Deliver',
-  delMethod: 'Delivery Method',
-  onSiteDel: 'On-site delivery',
-  emailMail: 'Secure email + mailed original',
-  mailFromOff: 'Mail from office',
-  digSign: 'Digital signature & seal',
-  tapSign: 'Tap to sign all documents',
-  signFin: 'Sign & Finalize',
-  docsDel: 'Documents delivered & acknowledged',
-  reminder: 'Reminder',
-  reInsp: 'Re-Inspection',
-  contFollow: 'Continue to Follow-Up',
-  verifClos: 'Verification & Closure',
-  caseClosure: 'Follow-Up & Case Closure',
-  daysSince: 'Day 47 since issuance',
-  corrRecv: 'Correction report received',
-  caseClosed: 'Case closed',
-  corrVerif: 'Correction Report Verification',
-  autoEval: 'Auto-evaluated',
-  adequate: 'Adequate',
-  reInspRec: 'Re-inspection recommended',
-  reqSupp: 'Request supplemental info',
-  schedReInsp: 'Schedule Re-Inspection',
-  reInspComp: 'Re-Inspection Completed',
-  genFinal: 'Generate Final Report',
-  finalRpt: 'Final Inspection Report',
-  awaitChief: 'Awaiting Chief approval',
-  submitClose: 'Submit & Close Case',
-  retQueue: 'Return to Case Queue',
-  suppReqd: 'Supplemental info requested — 15 day extension',
-  protoDemo: 'Prototype demo',
-  reportStruct: 'Reporting Structure',
-  directRep: 'Direct Reports',
-  acctSettings: 'Account Settings',
-  permsAcc: 'Permissions & Access',
-  inspectors: 'inspectors',
-  ytdCases: 'YTD cases',
-  signOut: 'Sign out',
-  exportRep: 'Export',
-  correctiveRec: 'CORRECTIVE RECOMMENDATION',
-  prohibOrder: 'SUSPENSION OF USE ORDER',
-  guidanceDoc: 'GUIDANCE REPORT',
-  documentNo: 'Document No.',
-  issueDate: 'Issue Date',
-  issuingAuth: 'ISSUING AUTHORITY',
-  to: 'TO',
-  legalAuth: 'LEGAL AUTHORITY',
-  inspDetails: 'INSPECTION DETAILS',
-  violsIdent: 'VIOLATIONS IDENTIFIED',
-  legalProv: 'Legal Provision Violated',
-  factualFind: 'Factual Findings',
-  reqActions: 'Required Corrective Actions',
-  corrDeadline: 'Correction Deadline',
-  importantNotice: 'IMPORTANT NOTICE — LEGAL CONSEQUENCES',
-  contactInfo: 'Contact Information',
-  officialSeal: 'Official Seal',
-  inspLabel: 'Labour Standards Inspector',
-  reprDir: 'Representative Director',
-  sampleNote:
-    'Sample document for demo only — Not an official government document',
-  askAiAgent: 'Ask AI Agent',
-  askAiSub: 'Get expert guidance for this inspection',
+// Base64-encoded PNG of the official LSIO seal (200x200 px, ~4.3 KB).
+// Embedded inline so the DOCX renders the actual image stamp in the
+// signature block without needing a network round-trip.
+const SEAL_PNG_BASE64_JA = 'iVBORw0KGgoAAAANSUhEUgAAAMgAAADICAYAAACtWK6eAAASbUlEQVR42u2de7gcZX3HP7McOEBIwSBwEJ4goYYAUQQSJOUicttURO5CGxsCSqFYapUpUCrigyiKgwWhAiIIPBwqBBAwQIaiEAiQhHAPQkOMSTAhEgq5X7i9/eP81mc73T1nz+7MzmW/3+c5z9mdnZl933d+n/n+fu/M7nrOOSRJqq2ShkCSBIgkCRBJEiCS1EZ1aQjap7LnxzYjErrA04gmL0+zWNmFQPAIEMEgaASIgIg/SLPUFgEiKHIVeHlsswApIBR5Cqwi9kmAZCyAihQ8ndZfAZJQoHRCkGgMBIgCQmMjQFo8+F0WAB9Ettk0dMH6GvvaGiiFLlgWWb4tsD0wP3TBKls2BPg4sCx0wZtV63YBQ0MXvGPPdwpdsLDs+ZsDG4cuWNFgv7YB3gpd4Gq89jFgJDCt1uvNjlengNIRgAwAxj+HLriy7PlnARcDl4cuuNS2GwU8ZcvnALsCnwFuBc4EekIXjLN1NwImAZ8HjgOusG0Adge+CdwP/Aq4NXTBhrLn/wg4C7gQ+ANwN/BT4E3gO8BXQhfcaPs/GrinRvsPBHqBWaELTqzR90uB8+3p88B5wFB7XgIWhS6Yaes+DYwZzNgWHZRCAzIAGNsBC4FFwKeBecBHgc+ELnjetr/Q4HgJGA14wH8Dd1nQVwPSDaxvpF0ncDHdbM4bzGUuT7A9I5nDw6xjVc31j+ci3mIR0/gFezKel/gvPuSDa4EpwCpgGjDV/gAeDl3wcgSQ0cAa4EFgVNXu3wY+ZsA+DWwLnA6EwGXAR+z5PsAznQZKIQEZAIylwGrgN8ARdlbtAo4C5gMPAT82YF61gHkWOKRqH38EZlcDUvXe5wE/2Jfj2ZadAVjGQmYyGeCS0AUX2nonA7dZUO9twAJMAK4ClgEX2bJ7gXLUQboZwo7szu95OtrHrwI9wCU1+v81c7fvGvw/Dl1wziAcZI7B1hGgFA6QfuA4AJje4G4OBrY2p5gD/A2wF3ALcK5Bdktl5ZHsz1iOBeB3PMJz3F9vv9WAHGyBOgv4lKVutXRT6IJTq1Ks0y3tO8MebwRMDl0wAeAWDwewkmX8luvZiu1YzCtY+rYcONvg3s1A372qVhoFHGnvu7PBNAV4FFgBbAasDF1wc39jXSRISkUCo9YBC13gRQ6Yb88/BzwMnFW1TvUZ9+uRs24FiMu2pOeWrdiezdkSYMVcnrhiosOb6PCe4/7zG8zdH7Wz9fNWQzxkL50CvAPMBb4M/Cyy6fUG7dnmhCcDl1derLTj1/zw3DW8zWJe6QXYnpHHdbHJaZaO7War7wjcW/b8w+35MiCwv6/Zsi/Y8+8DPwR+VPb8reqMbb/HIo/qKgIYDZ7F3gCutoAE2Ak4zM7gFc20dRYDLwMHAXyCcWf+gWd5nw100c0Klk63fL7Lgu39OqnME/Z4P+DaGutMNBd5zKAAuNn+f8QmA24yx6joXy01uh64D3gN+H3Z86v3u6PVFt8DTgNeeIO5RwHDdmHf57eih+Hsyas8xitM2w8olT1/FwP2ZNvHKJso6LX3uMhqsJ8Dw8yN/s9YR49F5XmeHSXXKVY9x+hn/XPsbNifDgld8EjZ8w/4C7Z5vMRGLGfptZZWfQf4FjAe+NCCcH8Lmk/a2bYR3WP7esagHA/cCJxQZ/2TbQKg1izWl4DhkWXXhS5YbX1+3YCppemf4pIDNmZTevHPrANxLX01dMENcR0XAZIBOGyb8cBJ9vTzVoDfb6nFOGDXv+YbDGMHAHrxp9B3/WI6fdO6fw4sK6pnWHH/E3OikQbQMOAG+q6HvGdudIEF+cXAC6ELHih7/inAg6EL3ix7/v7AI8CfAD/S9KdCFywqe36PAdmfnghdsLSqz69b/fCVyHozgOmhCw6s1C5rWcESXmUmk+81dx1i6862escBS6LXfooMSVcngFG13lRgatnz97DZojXAiaEL1p3h9boFPMeD/PsuoQvmA/R6/No2vRx40uoQ3x5PN+c4EVgHvGAQDTMQHrN0bS3wS0vbdqDvGskDButoYHRVelSyQjg6k7SGvunofYA7B+jmFwz6au1m9VZd9Wbf03e9BWB05OUxwHOVGq665hpotqj6eOUx5erquDoFDtvcsoK8ENgYum0Cw9hYPFvDcbAuEN2psep5NnWIp2gYL5lnApvRdi5hkwTnF9lOpJYYC/2n7vdYg2s/SHr/Ge21dZ/mUqscnGHQ/N4cbZe26uk7XXZ06qVq3mrsuBA6P65iFLvBq1SZ5gaQrr3AMdoDLnn+IFZw9ACMYwxiO+bde/MkGy9H03R6yrsbmK61QHkfflfAd6bt2Ucntl9B3BXwTezylynnWVp2ZAc4NXXCdPb4w0sZ1wLzQBZ+s0f7PVRXQJxig+wBb2d/4Sr1S9vyVoQser9r8FQO4WrMj4zkX2NVui1kNTLYTCUfwj9OXs4RZ3N00JLXcJA+QdOUNjBYsejqw6OPs1bML+3Ku+4QHcIfHo8BnLbDrTdEuB35nU7GLLT+fSt8FvReA34YucGXPHwpcE9l2SKT4vbPJoTiCvmlfqkAZG0mtsHXmAdWAjI4C0YBOtD8eqjKmvTkqaCTFasRN8pByZbpIj7PQq1xAm+jwaqRdpehNiin1d3fg3dAF82Lc58HA+tAFMyLLy8Dyyn1YVctLBt7S0AULq5YPAf4SWDKBvhsuo2OZxnHtWEBaTakGAkNqXa2ObVzHuOMAiRMOgdEeUIoKSeYAiWPA5Br5cpMsQ5IpQOKCQ2Dkz02yCklJcEhxaqLDq7jJYBQ93lm52TETDtIqHEqpipNyZc1JUgekekDkGkq54oqLQqRYgkMpVyMpV5rpVikLcLTzzCTlB5Is1CSppFit5JmqNzqrLkm7Jmk7IK3CITA6ry5JE5KS4JCynnKlOQVcEhySIMlYkS44pDggKQwgzU7nCg5B0h8k7XCRUjvhSLKQkzoHknamWqV2wtGoewgOQZKVeqRtNYh+rUjKYzwlBojqDqkI9UgpaThUd0h5rkdKScOhukPKcz2SaA0iOKQ0IMksIEX5ynsp34ozDhNzELmHVAQXKSVBreCQ0oYkLhcpxQ1HoxIcUhKQxJ1qxZ5i6YKglKbijr+WAZF7SEV2kVK76RUcUtKQxOkiLQGiaV0pD2olTmNzELmHVEQXKaVBpSTlxUVicRC5RzbSAblI/C7SpYOYPSDy8MMyeR3rwY5lU9+LNdir5nKP+E4wgmXwcdXKV9x2aZjzlTbJXdqrQTuI3CPbKWinAZO0i8hBClZYy2FSdBC5R74nKooKS5IuIgcpMBByl9bVlTbVAkLAtKrKdZEk4q3UzGDqzCPlUc18oKqkYZOkNgOiC4NSWmlWKoAovZI6Nc2K3UHkHlKRXEQ1iCS1AojSK6mT0yw5iCS1CxDVH1LR6hA5iCQ1C4jqD6nT65DYHETplVTENEspliQJEEkSIJLUPkBUoEsq1GNyEBXoUlELdaVYkiRACp8qaBAEiNQfHIJEgEgDOIcgESBSPzCUPV8D0w5ABjPFqxkswZFVNTKTNdBUrxykABIcSrGkOu4hOASIJDgEiDT4ukMqICBJfLmXivLOUbvjp5RG5zoFkjjO+oIj3fgppUV+0SGJ4wq34Eg/fkppdK7okMRxhVtwZCN+Sml1rsiQ1ArkwUAiOLITP4kDMtBV9qxehW/1Q2LNQpIWHFn9UFza8VNKs5NZv0UlLUgER3bip5RWJ/Ny/1Y7IUnjQmBePk6dVvyU0uhk3m5ubAckgiOb8VNK+0wgSNK5Sp7nH+xs5/vpVpMMpltJu4e+pUaA5AoSwSFABEkDEAgOASJFYIj+l7IlzzlX7wDqY7cDB3lu7gLoRPdoJC4HinM5SAcEnVIrpVgKPsEhQBSEgkOACBLBIUAEieDoIEDi/uldQSI4WlVcM6ulRgY6T9OZnQyJ4BicGrmUoRSrIMEqOFSDCBLBIUAEieAoJCAq1NsfxIIj2QJ9QEBUqGc3mAVH8gW6UqycQiI4clqDKM1KPrgFR/vSKzmIJLUKiOqQ7LiI3KO99YccJEeQCI4C1CCqQ5KBRHCkU380DIjSrPQgERzppVeJpVhykXggERzpuodqkAxDIjhyVoMozWofJIIjG+lVog6iNCvZwl1KPr1SiiVJcQIy2DRLLiJlxT2aSa/kIJIUNyByEalT3EMOIklJAyIXkfLiHm0DRFORUh7VTNzGkmLJRaQiukdLgMhFpKK7R6xFulxEKpp7tAyIXEQqsnvE6iByEalo7hELIM3QKUikpOCIO8uJ/UKhboWX0lTc8RcLIHIRqYjuEauDNPOBKkEixQlHK/dctS3FEiRS2nBkLsWKm1pJykocJno3r1xEyrN7JAJIlF5BIrUTjrizmEQcpNlGChKplS9gSCLFTyzFavZrggSJ4GgmhU+q/m3bJwp1AVHKYzwlCojqESmPdUdbHUT1iJS3uqPtKZbqESlPdUcqNUiz+aMgERxp1rFtA6TZekSQCI521x2pOYggkfIEB4DnXPtjrpUOVyBJ6tu8pWTBGOyxSxOO1ACJo+NJfuW9lL5rZAGO1Ir0ODqrlKvYcMQdL7kDJNrpZmYoBElx4Wj3dG7mUqy40y3VJfmvN7KSVmUOkLgGRnVJcVwjC3CknmL1NxhKuQRHFvqTGQeJ20mUcuUjpcoyHJkEJM4BU8qVbdfIOhyZBSRuSOQm2XONPMCRaUDq1SECpXhgZBWOzAOSxGAKlPTAyBscuQAkKTsWKO0fqzykVLkFJKmzj0BpPxh5gSN3gCQ52AIlmbHIMxy5BKRdoMR05hwOdAPzgSGhC1amNFYjgQ9DF8xrR7+LAEbuAYnrIJQ9fxdgQ+iCP/Z3Ji17/j8AE4GvA0uBq4A7Qhf09rPv+4BdgRD4LHBY6IJlzbSlap0y8Ok6L78UuuCBGts8DawPXXBgI27RSDs6AQ6ArjynAqELvOjBqDwfxAE5EtgAXBd9oRI0N3sfui3YmvWs5BgunHkn3x4CjAXGlD3/ntAFa8qePxbYO7KLnYAtgVXAcGAP4NFm2lKlY4Az67x2E/BAow7Zj1s00o6GwMgzHLkHpHrwWwBlwGC4jXPPAS4Hrjrdbf5P3V7g5jGTmUwG+ClwCvBF4Ft1dnFBpVkxAAKwNHTB9pH+rqp6fA4QDBDAfuiCy1tsR2HBKESK1czBKnv+ZsAmtngzYAHwAbCzBQXAu6EL1tn6hwFTgbeBPUMXvGHLNwIeB8aN4yRGMPb/nZXLnn8VMCl0wdA6bR1UW2yba4Bj6gBy5wSCSW+xkKW8BsBrPMVaVlRWWwxcY49/E7pgRrPtKDoYhXGQRtKuyMEcBfwK2C2yyp/s/8vAsWARBnOBV4HzgT3Knj8DuCB0QW/Z8/8OuO8pbj/0KW7vtsCi19KYEYxhPrO50dvguuiulc4MH2RbKuqp1ccRjJ3U9x47ATtR9vyDgGlVq+wAzA5dELbSjv7utC7ab8QUzkEaOcOZ7gKOjyy7AzgtdMGayH66QxdsKHv+fwBnAXsBL1l9sTp0wbtlz98CmAD8C7DaztTdwJXmPC/WuhX/PTYwg9tZxIuR4mVP9uMkuv58Yu/TLO5iAc/yHhv8yK6+D9wWuuDUSpuBZ4BhVgO9C3wUWA/sHbrgnUgfhwK/6G9MOgmMjgCkQVAqWha6YNt+9rEx8DrwCjAeeNZqgUMj6z0OvBW64Niy5+8BzDFw5gIvR9MU28YD3rJg7rctA6VYoQtOLXv+lsC9NnP2t8A3DYyrgV+aIx4ZumB+I+3oRDAqKtEBCl3gNXAgtyl7/qf6ef04YDvgitAFG4CHgEMszaKqLtkE2Lns+ZfaLNZy4FDbvt6U8N4WlG8C/9NAWwbSTwyOOcBtwBjgAIPjMUszL2uwHa6FMVUNUoQZryq9UPb86JdJbAFcbDM7AH9f9vxvAD2V1Kbs+ZOBL9sZutuWjwYWAtcDZ5v7PFnnfb8IzLL0ZiPgblv2Yp31ewZwxfNstuwZ4ChLC98HfmaQHg7cU6cdANt2qmN0NCCRQv4s4AZLPfpLybqAM4C19F0R7wHesRpkAXAw8FeWes0Aptvs1pOhC1aVPX9rc5DhVTNI1CiGDzJnouz5+wOn9tOF1cAPIsu+XdW/pVZPALxY9vxj6LtQ+D1bdv1gUtBO/nHWjqhB4qpTanxuflNgWOiCJW1s5zb03bayILJ8hE0YvFljmz3pu9XkpVb6K0CkwRT1uQqgIvZJgOQosLIUYHlsswDpQFiSDMQstUWASIkEabsnJnTEBIigEQwCRPAIAgEiSRlQSUMgSQJEkgSIJMWt/wVnPkm9LVQVSAAAAABJRU5ErkJggg==';
+
+// =============================================================================
+// Bilingual support — UI strings + agent-output language directive
+// =============================================================================
+
+type Lang = 'en' | 'ja';
+
+interface TranslationDict {
+  [key: string]: string;
+}
+
+const TRANSLATIONS: Record<Lang, TranslationDict> = {
+  en: {
+    // Header
+    appTitle: 'LSB Report Drafter',
+    appSubtitle: 'Identifies LSA & ISHA article violations from inspection notes',
+    pocBadge: 'POC',
+    newChat: 'New chat',
+    newChatShort: 'New',
+    confirmNewChat: 'Start a new chat? This will clear the current conversation.',
+    // Empty state
+    emptyHeading: 'What did you observe during the inspection?',
+    emptyDescription: 'Describe the conditions in your own words. The agent will read your notes, ask clarifying questions if anything is ambiguous, then identify the specific LSA or ISHA articles violated and draft the appropriate report.',
+    // Input bar
+    inputPlaceholder: 'Describe what you observed during the inspection…',
+    pocFooterNote: 'POC mode: dashboard metadata auto-populated',
+    sessionLabel: 'Session',
+    poweredBy: 'Powered by Claude · Anthropic',
+    // Loader
+    loaderReading: 'Agent reading notes',
+    loaderReadingSub: 'Checking whether clarifications are needed…',
+    loaderDrafting: 'Agent drafting reports',
+    loaderDraftingSub: 'Cross-referencing LSA & ISHA articles, populating tables…',
+    // Clarify
+    clarifyHeading: 'A few clarifications to identify the right articles',
+    otherOption: 'Other',
+    pleaseSpecify: 'Please specify…',
+    continueDraft: 'Continue and draft',
+    clarifySubmitted: 'Clarifications submitted — see drafts below.',
+    // Reports list
+    oneDraftGenerated: '1 draft generated. Tap to review and approve.',
+    nDraftsGenerated: '{n} drafts generated. Tap any card to review.',
+    generatedIn: 'Generated in',
+    confirmPill: 'Confirm',
+    allDeleted: 'All drafts in this batch were deleted.',
+    open: 'Open →',
+    findingCount: 'finding',
+    findingCountPlural: 'findings',
+    // Drill-in
+    backToDrafts: 'Back to drafts',
+    backShort: 'Back',
+    editFields: 'Edit fields',
+    editShort: 'Edit',
+    doneEditing: 'Done editing',
+    doneShort: 'Done',
+    deleteAction: 'Delete',
+    deleteConfirm: 'Delete this draft? It will be removed from this session.',
+    approveDownload: 'Approve & download .docx',
+    downloadShort: 'Download',
+    approved: 'Approved & sent',
+    sentShort: 'Sent',
+    dateLabel: 'Date:',
+    docNumLabel: 'Doc #:',
+    toLabel: 'To',
+    attnLabel: 'Attn:',
+    issuedByLabel: 'Issued By',
+    badgeLabel: 'Badge:',
+    inspectorSignature: 'Inspector signature',
+    severityLabel: 'SEVERITY:',
+    // Verification
+    verificationHeading: 'Inspector — please confirm before finalising',
+    verificationDescription: 'The provisional draft below uses placeholders for the items below. Please provide the actual values before the report is finalised.',
+    verificationPlaceholder: 'Type the confirmed value…',
+    verificationApply: 'Apply & finalise draft',
+    verificationFinalising: 'Agent finalising draft…',
+    // Escalation
+    escalationLabel: 'Escalation Required',
+    // Download toast
+    downloadedTitle: 'Word document downloaded',
+    downloadedSub: '{name}.docx saved to your downloads',
+    // Generation popup
+    genPopupTitle: 'Agent created the report in {time}',
+    genPopupSub: 'Includes triage, RAG, and draft generation',
+    // Severity display
+    sev_IMMINENT_DANGER: 'IMMINENT DANGER',
+    sev_SUBSTANTIVE: 'SUBSTANTIVE',
+    sev_MINOR: 'MINOR',
+    sev_ESCALATION: 'ESCALATION',
+    // Document type display
+    doc_SUSPENSION: 'SUSPENSION OF USE ORDER',
+    doc_CORRECTIVE: 'CORRECTIVE RECOMMENDATION',
+    doc_GUIDANCE: 'GUIDANCE NOTICE',
+    doc_ESCALATION: 'ESCALATION REQUIRED',
+    // Language switcher
+    langSwitchLabel: 'Language'
+  },
+  ja: {
+    appTitle: '労働基準監督署 報告書ドラフター',
+    appSubtitle: '労働基準法・労働安全衛生法違反を点検記録から特定します',
+    pocBadge: 'POC',
+    newChat: '新規チャット',
+    newChatShort: '新規',
+    confirmNewChat: '新規チャットを開始しますか？現在の会話は削除されます。',
+    emptyHeading: '点検中に確認した状況をご記入ください',
+    emptyDescription: 'ご自身の言葉で状況を記述してください。エージェントが内容を読み取り、不明確な点があれば追加質問を行います。その後、該当する労働基準法または労働安全衛生法の条文を特定し、適切な報告書を作成します。',
+    inputPlaceholder: '点検中に確認した状況を記述してください…',
+    pocFooterNote: 'POC モード:ダッシュボードメタデータが自動入力されます',
+    sessionLabel: 'セッション',
+    poweredBy: 'Claude · Anthropic 提供',
+    loaderReading: 'エージェントが記録を確認中',
+    loaderReadingSub: '追加情報の必要性を確認しています…',
+    loaderDrafting: 'エージェントが報告書を作成中',
+    loaderDraftingSub: '労働基準法・労働安全衛生法の条文を照合し、表を作成しています…',
+    clarifyHeading: '適切な条文を特定するための追加確認',
+    otherOption: 'その他',
+    pleaseSpecify: '詳細をご記入ください…',
+    continueDraft: '続行して作成',
+    clarifySubmitted: '追加情報が送信されました。下の草稿をご確認ください。',
+    oneDraftGenerated: '1件の草稿が作成されました。タップして確認・承認してください。',
+    nDraftsGenerated: '{n}件の草稿が作成されました。カードをタップしてご確認ください。',
+    generatedIn: '作成時間:',
+    confirmPill: '要確認',
+    allDeleted: 'このバッチの草稿はすべて削除されました。',
+    open: '開く →',
+    findingCount: '件の指摘事項',
+    findingCountPlural: '件の指摘事項',
+    backToDrafts: '草稿一覧に戻る',
+    backShort: '戻る',
+    editFields: '項目を編集',
+    editShort: '編集',
+    doneEditing: '編集完了',
+    doneShort: '完了',
+    deleteAction: '削除',
+    deleteConfirm: 'この草稿を削除しますか？このセッションから削除されます。',
+    approveDownload: '承認して .docx をダウンロード',
+    downloadShort: 'ダウンロード',
+    approved: '承認・送信済み',
+    sentShort: '送信済',
+    dateLabel: '発行日:',
+    docNumLabel: '文書番号:',
+    toLabel: '宛先',
+    attnLabel: '担当:',
+    issuedByLabel: '発行者',
+    badgeLabel: 'バッジ番号:',
+    inspectorSignature: '監督官署名',
+    severityLabel: '重大度:',
+    verificationHeading: '監督官による確認 — 最終確定の前に',
+    verificationDescription: '下記の暫定版報告書には仮の値が記載されています。最終確定の前に正確な情報をご記入ください。',
+    verificationPlaceholder: '確認済みの値をご記入ください…',
+    verificationApply: '適用して報告書を確定',
+    verificationFinalising: 'エージェントが報告書を確定中…',
+    escalationLabel: '上申必要',
+    downloadedTitle: 'Word 文書がダウンロードされました',
+    downloadedSub: '{name}.docx がダウンロードフォルダに保存されました',
+    genPopupTitle: 'エージェントは {time} で報告書を作成しました',
+    genPopupSub: 'トリアージ、RAG、ドラフト生成を含む',
+    sev_IMMINENT_DANGER: '緊急危険',
+    sev_SUBSTANTIVE: '実質的違反',
+    sev_MINOR: '軽微',
+    sev_ESCALATION: '上申必要',
+    doc_SUSPENSION: '使用停止命令',
+    doc_CORRECTIVE: '是正勧告書',
+    doc_GUIDANCE: '指導通知書',
+    doc_ESCALATION: '上申必要',
+    langSwitchLabel: '言語'
+  }
 };
 
-const LangCtx = createContext({ lang: 'en', t: (k) => k, setLang: () => {} });
-const useT = () => useContext(LangCtx);
-const tFor = (lang) => (key) => TR[key] ?? key;
-
-const CASE = {
-  id: 'INS-2026-04827',
-  company: 'Hanamura Kikai Co., Ltd.',
-  companyJa: '花村機械株式会社',
-  address: '2-15-3 Kawaguchi, Saitama Prefecture',
-  industry: 'Metal Press Manufacturing',
-  employees: 87,
-  riskScore: 78,
-  priority: 'HIGH',
-  trigger: 'Worker complaint (Apr 18) + risk model flag',
-  lastInspection: '2023-06-12',
-  representative: 'Hanamura Soutarou-san',
-};
-const INSP = {
-  name: 'Mochizuki Ren-san',
-  nameJa: '望月 蓮 さん',
-  title: 'Senior Labour Standards Inspector',
-  titleJa: '主任労働基準監督官',
-  office: 'Higashino Labour Standards Inspection Office',
-  officeJa: '東野労働基準監督署',
-  badge: 'LSI-11-4827',
-  joined: '2018-04-01',
-  email: 'mochizuki.r@mhlw.go.jp',
-};
-const ADMIN = {
-  name: 'Kirishima Aoi-san',
-  nameJa: '霧島 葵 さん',
-  title: 'Chief, Higashino LSI Office',
-  titleJa: '東野労働基準監督署長',
-  office: 'Higashino Labour Standards Inspection Office',
-  officeJa: '東野労働基準監督署',
-  badge: 'LSI-CHF-2104',
-  email: 'kirishima.a@mhlw.go.jp',
+const t = (key: string, lang: Lang, vars?: Record<string, string | number>): string => {
+  let s = TRANSLATIONS[lang][key] ?? TRANSLATIONS.en[key] ?? key;
+  if (vars) {
+    Object.entries(vars).forEach(([k, v]) => {
+      s = s.replace(`{${k}}`, String(v));
+    });
+  }
+  return s;
 };
 
-const Pill = ({ tone = 'slate', children, className = '' }) => {
-  const tones = {
-    slate: 'bg-slate-100 text-slate-700 border-slate-200',
-    red: 'bg-red-50 text-red-700 border-red-200',
-    amber: 'bg-amber-50 text-amber-800 border-amber-200',
-    green: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-    blue: 'bg-blue-50 text-blue-700 border-blue-200',
-    purple: '',
-    purpleSolid: '',
+// Map English document-type token (emitted by agent) to display label
+const docTypeDisplay = (docType: string, lang: Lang): string => {
+  const up = docType.toUpperCase();
+  if (up.includes('SUSPENSION')) return t('doc_SUSPENSION', lang);
+  if (up.includes('CORRECTIVE')) return t('doc_CORRECTIVE', lang);
+  if (up.includes('GUIDANCE')) return t('doc_GUIDANCE', lang);
+  if (up.includes('ESCALATION')) return t('doc_ESCALATION', lang);
+  return docType;
+};
+
+// Map severity token to display label
+const sevDisplay = (sev: string | null, lang: Lang): string => {
+  if (!sev) return '';
+  if (sev === 'IMMINENT DANGER') return t('sev_IMMINENT_DANGER', lang);
+  if (sev === 'SUBSTANTIVE') return t('sev_SUBSTANTIVE', lang);
+  if (sev === 'MINOR') return t('sev_MINOR', lang);
+  if (sev === 'ESCALATION') return t('sev_ESCALATION', lang);
+  return sev;
+};
+
+// Language directive appended to the agent system prompt
+const langDirective = (lang: Lang): string => {
+  if (lang === 'ja') {
+    return `
+
+==============================================================================
+LANGUAGE — RESPOND IN JAPANESE
+==============================================================================
+
+You MUST emit ALL content values in formal Japanese (敬体). This includes:
+  • NARRATIVE paragraph — formal business Japanese
+  • All TABLE_SECTION TITLE values — Japanese names
+  • All HEADERS values (except the literal "#" symbol) — Japanese column names
+  • All ROW cell values — Japanese
+  • All VERIFICATION ITEM values — Japanese
+  • All MCQ question text and option text — Japanese
+  • TO_BUSINESS_NAME, TO_BUSINESS_ADDRESS, TO_REPRESENTATIVE — Japanese
+  • ISSUING_OFFICE — Japanese name (e.g. "足立労働基準監督署")
+  • Inspector name dummy: "山田 太郎 監督官"
+
+HOWEVER, these structural tokens MUST remain in literal English so the
+parser still works:
+  • Section markers: DOCUMENT:, DATE:, DOCUMENT_NUMBER:, ISSUING_OFFICE:,
+    TO_BUSINESS_NAME:, TO_BUSINESS_ADDRESS:, TO_REPRESENTATIVE:, NARRATIVE:,
+    INSPECTOR_NAME:, INSPECTOR_BADGE:, SEVERITY:, ITEM:, ROW:, HEADERS:,
+    TITLE:
+  • [TABLE_SECTION_1], [TABLE_SECTION_2], [TABLE_SECTION_3], [VERIFICATION]
+  • DOCUMENT type values stay English: "SUSPENSION OF USE ORDER",
+    "CORRECTIVE RECOMMENDATION", "GUIDANCE NOTICE"
+  • SEVERITY values stay English: "IMMINENT DANGER", "SUBSTANTIVE", "MINOR"
+  • ESCALATION marker stays English: "ESCALATION REQUIRED"
+  • Article citation FORMAT: cite as "労働基準法第37条" or "労働安全衛生法第22条"
+    (Japanese form when language=ja). Use Article numbers exactly.
+  • The first column header in every table is the literal "#" character
+
+Dates in Japanese form: "2026年5月20日" not "20 May 2026".
+
+For JSON triage output, keep keys in English ("decision", "questions", "id",
+"question", "options") but question text and option text must be Japanese.`;
+  }
+  return '';
+};
+
+
+
+const TRIAGE_PROMPT = `You are the LSB Report Drafter triage stage. The inspector has submitted vague field notes. Decide ONE of two things:
+
+A) Notes have enough detail to draft a defensible report immediately.
+B) Notes have specific ambiguities that, if clarified by 1–3 quick questions, would substantially improve article identification or document type selection.
+
+If (B), ask up to THREE multiple-choice questions. Each must:
+  • Be a real ambiguity in the inspector's notes — not generic "tell me more"
+  • Have exactly 3 concrete options + a 4th "Other" option
+  • Help cite the right LSA or ISHA article OR pick the right document type
+
+Output strict JSON, nothing else:
+{
+  "decision": "ask" | "draft",
+  "questions": [
+    { "id": "q1", "question": "...", "options": ["...", "...", "..."] }
+  ]
+}
+
+Decide ASK when a hazard is generic and the specific category materially changes the article cited.
+Decide DRAFT when the notes name specific equipment / specific violation. Bias toward DRAFT.
+
+DO NOT ask for things the dashboard auto-populates:
+  • Exact employer address / business registration
+  • Exact worker headcount
+  • Inspector identity / badge number
+  • Date of inspection`;
+
+const DRAFT_PROMPT = `You are the LSB Report Drafter. Transform inspector field notes into formal draft enforcement documents.
+
+==============================================================================
+PRIMARY MOTIVE — METICULOUS ARTICLE IDENTIFICATION
+==============================================================================
+
+Identify SPECIFIC LSA or ISHA articles violated. Name the exact article.
+If you cannot match a specific article write "[article to be confirmed]" and
+add to verification. Never invent article numbers.
+
+==============================================================================
+RECIPIENT — addresses the BUSINESS, not the LSIO
+==============================================================================
+
+The recipient block addresses the BUSINESS (employer). The LSIO appears only
+in the "ISSUED BY" footer.
+
+==============================================================================
+LEGAL CORPUS (LSA + ISHA only)
+==============================================================================
+
+LSA: 15, 24, 32, 34, 35, 36, 37, 89, 90, 106, 107, 108, 109
+ISHA: 20, 21, 22, 23, 59, 61, 65, 66, 100
+
+If a violation doesn't match these write "[article to be confirmed]".
+NEVER cite OISH or other ordinances.
+
+==============================================================================
+SEVERITY RUBRIC
+==============================================================================
+
+IMMINENT DANGER → SUSPENSION OF USE ORDER (immediate)
+SUBSTANTIVE → CORRECTIVE RECOMMENDATION (14–30 days)
+MINOR → GUIDANCE NOTICE (30–60 days)
+
+ESCALATION (do NOT draft) when input describes falsification, retaliation,
+fatality, hospitalisation, forced labour, obstruction, willful violation.
+
+==============================================================================
+MULTIPLE REPORTS
+==============================================================================
+
+When findings span different severities, produce SEPARATE complete reports.
+Separator (own line): ===END_REPORT===
+Order: highest severity first.
+
+==============================================================================
+OUTPUT FORMAT
+==============================================================================
+
+DOCUMENT: SUSPENSION OF USE ORDER | CORRECTIVE RECOMMENDATION | GUIDANCE NOTICE
+DATE: {date}
+DOCUMENT_NUMBER: LSB-2025-DRAFT-{4-digit}
+ISSUING_OFFICE: {LSIO name}
+
+TO_BUSINESS_NAME: {employer name}
+TO_BUSINESS_ADDRESS: {address}
+TO_REPRESENTATIVE: {name, title}
+
+NARRATIVE: {one paragraph}
+
+[TABLE_SECTION_1]
+TITLE: ...
+HEADERS: ...
+ROW: ...
+
+(see CRITICAL ROW FORMAT below)
+
+[TABLE_SECTION_2]
+TITLE: ...
+HEADERS: ...
+ROW: ...
+
+[TABLE_SECTION_3]
+TITLE: ...
+HEADERS: ...
+ROW: ...
+
+[VERIFICATION]
+ITEM: ...
+
+INSPECTOR_NAME: Inspector Taro Yamada
+INSPECTOR_BADGE: LSB-INS-1138
+
+SEVERITY: IMMINENT DANGER | SUBSTANTIVE | MINOR
+
+==============================================================================
+CRITICAL — ROW FORMAT (read carefully)
+==============================================================================
+
+HEADERS uses COMMAS to separate column names.
+ROW uses the PIPE CHARACTER ("|") to separate cell values — NOT commas.
+This is because cell values frequently contain commas (e.g. addresses, dates
+with "JST", premium pay descriptions). The parser splits ROW values on "|".
+
+Every ROW must have EXACTLY the same number of pipe-separated values as
+there are commas-plus-one headers. If HEADERS has 7 columns, every ROW
+must contain exactly 6 pipe characters.
+
+The FIRST COLUMN is always literally "#" in HEADERS and a sequence number
+(1, 2, 3, ...) in each ROW.
+
+COMPLETE WORKED EXAMPLE (study this carefully):
+
+  [TABLE_SECTION_1]
+  TITLE: Findings and Required Corrections
+  HEADERS: #, Legal Article, Factual Finding, Workers Affected, Required Correction, Deadline, Evidence to Submit
+  ROW: 1 | LSA Article 37 | Workers performed overtime hours for which premium wages were not paid at the legally required rate (minimum 25% premium for hours exceeding the statutory limit). | 6 line operators | Calculate and pay all outstanding overtime premium wages owed; establish a compliant payroll process ensuring premium rates are applied to all future overtime hours. | 20 May 2026 (14 days from issue date) | Wage ledger extracts showing recalculated payments; payroll records confirming retrospective payments; written confirmation of revised payroll procedure.
+  ROW: 2 | ISHA Article 22 | Accumulation of waste, debris, and lead was observed obstructing walkways in the main work area, creating a risk of exposure to hazardous substances and impeding safe egress. | 12 production workers | Remove all waste, debris, and lead from walkways; implement a documented housekeeping schedule to prevent recurrence. | 05 June 2026 (30 days from issue date) | Photographic evidence of cleared walkways; copy of housekeeping schedule signed by responsible manager.
+
+Notice:
+  • HEADERS row uses commas
+  • Each ROW uses pipes to separate cells
+  • The "#" header is literally the hash character — nothing else
+  • The "#" value in each row is just the row number (1, 2, 3...)
+  • Cells freely contain commas inside them — that's fine, only pipes split
+
+NEVER use commas to separate ROW values. NEVER omit pipes. NEVER use any
+other delimiter (semicolon, tab, etc.).
+
+==============================================================================
+SECTION TITLES — use proper section names
+==============================================================================
+
+TITLE should be the descriptive name of the section, not "SCHEDULE 1" or
+"Section 1". Suggested titles per document type:
+
+SUSPENSION OF USE ORDER:
+  Section 1: "Items Suspended from Use"
+  Section 2: "Factual Basis for Suspension"
+  Section 3: "Instructions to the Employer"
+
+CORRECTIVE RECOMMENDATION:
+  Section 1: "Findings and Required Corrections"
+  Section 2: "Reporting Requirement"
+  Section 3: "Consequences of Non-Compliance"
+
+GUIDANCE NOTICE:
+  Section 1: "Areas Recommended for Improvement"
+  Section 2: "Related Legal Context"
+  (no Section 3)
+
+==============================================================================
+COLUMN STRUCTURES
+==============================================================================
+
+SUSPENSION OF USE ORDER:
+  S1: #, Equipment/Area/Process, Location, Hazard Type, Legal Basis, Required Action, Verification Method
+  S2: #, Inspector Observation, Workers Affected, Time of Observation
+  S3: #, Instruction
+
+CORRECTIVE RECOMMENDATION:
+  S1: #, Legal Article, Factual Finding, Workers Affected, Required Correction, Deadline, Evidence to Submit
+  S2: #, Reporting Requirement
+  S3: #, Consequence of Non-Compliance
+
+GUIDANCE NOTICE:
+  S1: #, Subject, Observation, Suggested Improvement, Suggested Timeframe
+  S2: #, Article (informational only), Relevance
+  S3: omit
+
+==============================================================================
+DUMMY VALUES — every cell concrete and plausible
+==============================================================================
+
+NEVER write "[from employer DB]", "[to be confirmed]", or similar in cells.
+Always populate.
+
+  date:                    use input date, else "06 May 2026"
+  document_number:         "LSB-2025-DRAFT-0042"
+  issuing_office:          plausible name from input, else "Adachi Labour
+                           Standards Inspection Office"
+  to_business_name:        from input, else "Sample Industries Co., Ltd."
+  to_business_address:     "1-2-3 Sample-cho, Adachi-ku, Tokyo 121-0001"
+  to_representative:       "Mr. Hiroshi Tanaka, Representative Director"
+  workers_affected:        plausible specific count e.g. "3 production workers"
+  time_of_observation:     plausible time e.g. "14:30 JST during floor walkthrough"
+  inspector_name:          "Inspector Taro Yamada"
+  inspector_badge:         "LSB-INS-1138"
+
+==============================================================================
+[VERIFICATION] section — STRICT RULES
+==============================================================================
+
+ASK ONLY about:
+  • Specific equipment serial/model numbers / asset IDs
+  • Specific worker names tied to a finding (injured worker name)
+  • Specific incident dates (when something occurred — not inspection date)
+  • Specific quantities tied to a finding (unpaid amounts, overtime hours)
+  • Identification of specific witnesses
+
+DO NOT ASK about:
+  ✗ Date of inspection — dashboard auto-fills
+  ✗ Time of observation — you already filled
+  ✗ Business name, address, representative name/title — you filled with dummies
+  ✗ Inspector name or badge — dashboard fills
+  ✗ Issuing office — dashboard fills
+  ✗ Document number — system generates
+  ✗ Anything you've already populated with a plausible value
+
+Cap [VERIFICATION] at 3 items maximum. If nothing genuinely needs verification,
+emit zero items. Quality over quantity.
+
+==============================================================================
+NON-NEGOTIABLE RULES
+==============================================================================
+
+• Recipient block addresses BUSINESS, not LSIO
+• Cite ONLY LSA and ISHA articles — never invent
+• Every cell concrete value — no "[bracketed placeholders]" in cells
+• English only
+• Reports end at SEVERITY:
+• When multiple reports, separate with ===END_REPORT===`;
+
+const REDRAFT_PROMPT = `You are finalising a provisional draft. You will receive:
+  1. The PROVISIONAL DRAFT
+  2. The inspector's CONFIRMED ANSWERS
+
+Regenerate the SAME report with the confirmed answers substituted into the
+appropriate cells. Output identical format EXCEPT:
+  • [VERIFICATION] section MUST be EMPTY (just the marker, no ITEMs)
+  • Update cells where confirmed answers change values
+  • Preserve everything else exactly — severity, articles, narrative, deadlines
+
+Output the complete report. No commentary, no preamble.`;
+
+// =============================================================================
+// Types & parsing
+// =============================================================================
+
+interface TableSection {
+  title: string;
+  headers: string[];
+  rows: string[][];
+}
+
+interface ParsedReport {
+  documentType: string;
+  date: string;
+  documentNumber: string;
+  issuingOffice: string;
+  businessName: string;
+  businessAddress: string;
+  representative: string;
+  narrative: string;
+  sections: TableSection[];
+  verificationItems: string[];
+  inspectorName: string;
+  inspectorBadge: string;
+  severity: 'IMMINENT DANGER' | 'SUBSTANTIVE' | 'MINOR' | 'ESCALATION' | null;
+  rawText: string;
+}
+
+interface ClarifyQuestion {
+  id: string;
+  question: string;
+  options: string[];
+}
+
+interface Message {
+  role: 'user' | 'assistant';
+  type: 'text' | 'clarify' | 'reports' | 'escalation';
+  content: string;
+  questions?: ClarifyQuestion[];
+  reports?: ParsedReport[];
+  timestamp: Date;
+  originalNotes?: string;
+  generationMs?: number; // for reports/escalation messages
+}
+
+const parseReport = (text: string): ParsedReport => {
+  const get = (key: string): string => {
+    const re = new RegExp(`^${key}:\\s*(.+?)$`, 'mi');
+    const m = text.match(re);
+    return m ? m[1].trim() : '';
   };
-  const inline =
-    tone === 'purple'
-      ? { background: C.lightest, color: C.darkest, borderColor: C.light }
-      : tone === 'purpleSolid'
-      ? { background: C.core, color: 'white', borderColor: C.core }
-      : {};
-  return (
-    <span
-      style={inline}
-      className={`inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium border rounded ${tones[tone]} ${className}`}
-    >
-      {children}
-    </span>
-  );
-};
-const Card = ({ children, className = '', style = {} }) => (
-  <div
-    style={style}
-    className={`bg-white border border-slate-200 rounded-md ${className}`}
-  >
-    {children}
-  </div>
-);
-const SectionTitle = ({ icon: Icon, title, ja, right }) => (
-  <div className="flex items-end justify-between mb-3 pb-2 border-b border-slate-200 gap-2">
-    <div className="flex items-center gap-2 min-w-0">
-      {Icon && (
-        <Icon className="w-4 h-4 flex-shrink-0" style={{ color: C.core }} />
-      )}
-      <h3 className="text-xs sm:text-sm font-semibold text-slate-800 tracking-wide uppercase truncate">
-        {title}
-      </h3>
-      {ja && (
-        <span className="text-xs text-slate-500 hidden sm:inline">{ja}</span>
-      )}
-    </div>
-    {right && <div className="flex-shrink-0">{right}</div>}
-  </div>
-);
-const KV = ({ k, v }) => (
-  <div className="flex justify-between gap-4 py-1.5 text-sm border-b border-slate-100 last:border-0">
-    <div className="text-slate-500">{k}</div>
-    <div className="text-slate-800 font-medium text-right">{v}</div>
-  </div>
-);
-const PrimaryBtn = ({ children, className = '', ...props }) => (
-  <button
-    style={{ background: C.core }}
-    onMouseEnter={(e) => {
-      if (!e.currentTarget.disabled) e.currentTarget.style.background = C.dark;
-    }}
-    onMouseLeave={(e) => {
-      if (!e.currentTarget.disabled) e.currentTarget.style.background = C.core;
-    }}
-    className={`px-4 py-2 text-white text-sm font-medium rounded flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed transition ${className}`}
-    {...props}
-  >
-    {children}
-  </button>
-);
-const SecondaryBtn = ({ children, className = '', ...props }) => (
-  <button
-    style={{ borderColor: C.core, color: C.core }}
-    className={`px-4 py-2 border text-sm font-medium rounded flex items-center justify-center gap-2 hover:bg-purple-50 transition ${className}`}
-    {...props}
-  >
-    {children}
-  </button>
-);
-const RejectBtn = ({ children, className = '', ...props }) => (
-  <button
-    className={`px-3 py-2 border border-slate-300 hover:border-red-400 hover:text-red-600 text-slate-700 text-xs rounded flex items-center justify-center gap-1 transition ${className}`}
-    {...props}
-  >
-    {children}
-  </button>
-);
 
-const DecisionButtons = ({ onConfirm, onReject, status, confirmLabel }) => {
-  const { t } = useT();
-  if (status === 'confirmed' || status === 'approved')
-    return (
-      <Pill tone="green">
-        <CheckCircle2 className="w-3 h-3" />
-        {t('approved')}
-      </Pill>
-    );
-  if (status === 'rejected')
-    return (
-      <Pill tone="slate">
-        <X className="w-3 h-3" />
-        {t('rejected')}
-      </Pill>
-    );
-  if (status === 'order_issued')
-    return (
-      <Pill tone="red">
-        <Stamp className="w-3 h-3" />
-        {t('issuedOnSite')}
-      </Pill>
-    );
-  return (
-    <div className="flex gap-1.5">
-      <button
-        onClick={onConfirm}
-        style={{ background: C.core }}
-        onMouseEnter={(e) => (e.currentTarget.style.background = C.dark)}
-        onMouseLeave={(e) => (e.currentTarget.style.background = C.core)}
-        className="px-2.5 py-1.5 text-white text-xs rounded flex items-center gap-1 transition"
-      >
-        <Check className="w-3 h-3" />
-        {confirmLabel || t('confirm')}
-      </button>
-      <RejectBtn onClick={onReject} className="px-2.5 py-1.5">
-        <X className="w-3 h-3" />
-        {t('reject')}
-      </RejectBtn>
-    </div>
-  );
+  const sections: TableSection[] = [];
+  const sectionRegex = /\[TABLE_SECTION_\d+\]([\s\S]*?)(?=\[TABLE_SECTION_\d+\]|\[VERIFICATION\]|INSPECTOR_NAME:|SEVERITY:|$)/g;
+  let match;
+
+  // Parse a single ROW value string into cells. Prefer pipe delimiter; fall
+  // back to comma if the pipe split yields fewer columns than expected. This
+  // makes the parser resilient to the agent emitting either delimiter.
+  const parseRowValues = (raw: string, expectedCols: number): string[] => {
+    const pipeSplit = raw.split('|').map(c => c.trim());
+    if (pipeSplit.length >= expectedCols) return pipeSplit;
+
+    // Fall back to comma split — but be aware that legitimate cell content
+    // may contain commas (e.g. dates "20 May 2026, JST"). Use a quote-aware
+    // splitter: commas inside parens or quotes don't separate columns.
+    const out: string[] = [];
+    let cur = '';
+    let depth = 0;
+    let inQuote = false;
+    for (let i = 0; i < raw.length; i++) {
+      const ch = raw[i];
+      if (ch === '"' || ch === '\'') { inQuote = !inQuote; cur += ch; continue; }
+      if (ch === '(' || ch === '[') { depth++; cur += ch; continue; }
+      if (ch === ')' || ch === ']') { depth--; cur += ch; continue; }
+      if (ch === ',' && depth === 0 && !inQuote && out.length < expectedCols - 1) {
+        out.push(cur.trim());
+        cur = '';
+        continue;
+      }
+      cur += ch;
+    }
+    if (cur.trim()) out.push(cur.trim());
+    return out;
+  };
+
+  while ((match = sectionRegex.exec(text)) !== null) {
+    const block = match[1];
+    const titleMatch = block.match(/TITLE:\s*(.+?)$/m);
+    const headersMatch = block.match(/HEADERS:\s*(.+?)$/m);
+    if (!titleMatch || !headersMatch) continue;
+    const title = titleMatch[1].trim();
+    const headers = headersMatch[1].split(',').map(h => h.trim());
+    const rowMatches = [...block.matchAll(/^ROW:\s*(.+?)$/gm)];
+    const rows = rowMatches.map(r => {
+      const cells = parseRowValues(r[1], headers.length);
+      // Pad with empty strings if too few; truncate if too many
+      while (cells.length < headers.length) cells.push('');
+      return cells.slice(0, headers.length);
+    });
+    sections.push({ title, headers, rows });
+  }
+
+  const verificationItems: string[] = [];
+  const vMatch = text.match(/\[VERIFICATION\]([\s\S]*?)(?=INSPECTOR_NAME:|SEVERITY:|$)/);
+  if (vMatch) {
+    const itemMatches = [...vMatch[1].matchAll(/^ITEM:\s*(.+?)$/gm)];
+    itemMatches.forEach(im => verificationItems.push(im[1].trim()));
+  }
+
+  let severity: ParsedReport['severity'] = null;
+  if (/SEVERITY:\s*IMMINENT DANGER/i.test(text)) severity = 'IMMINENT DANGER';
+  else if (/SEVERITY:\s*SUBSTANTIVE/i.test(text)) severity = 'SUBSTANTIVE';
+  else if (/SEVERITY:\s*MINOR/i.test(text)) severity = 'MINOR';
+  else if (/ESCALATION REQUIRED/i.test(text)) severity = 'ESCALATION';
+
+  return {
+    documentType: get('DOCUMENT'),
+    date: get('DATE'),
+    documentNumber: get('DOCUMENT_NUMBER'),
+    issuingOffice: get('ISSUING_OFFICE'),
+    businessName: get('TO_BUSINESS_NAME'),
+    businessAddress: get('TO_BUSINESS_ADDRESS'),
+    representative: get('TO_REPRESENTATIVE'),
+    narrative: get('NARRATIVE'),
+    sections,
+    verificationItems,
+    inspectorName: get('INSPECTOR_NAME') || 'Inspector Taro Yamada',
+    inspectorBadge: get('INSPECTOR_BADGE') || 'LSB-INS-1138',
+    severity,
+    rawText: text
+  };
 };
 
-const Seal = ({ size = 80 }) => (
-  <svg
-    width={size}
-    height={size}
-    viewBox="0 0 100 100"
-    style={{ transform: 'rotate(-10deg)' }}
-  >
-    <circle
-      cx="50"
-      cy="50"
-      r="46"
-      fill="none"
-      stroke="#dc2626"
-      strokeWidth="2.5"
-    />
-    <circle
-      cx="50"
-      cy="50"
-      r="38"
-      fill="none"
-      stroke="#dc2626"
-      strokeWidth="1.5"
-    />
-    <text
-      x="50"
-      y="38"
-      fontSize="8"
-      fill="#dc2626"
-      textAnchor="middle"
-      fontWeight="bold"
-    >
-      SAITAMA
+const splitReports = (text: string): ParsedReport[] => {
+  if (text.includes('ESCALATION REQUIRED')) {
+    return [{ ...parseReport(''), severity: 'ESCALATION', rawText: text, documentType: 'ESCALATION REQUIRED', narrative: text }];
+  }
+  return text.split(/^===END_REPORT===\s*$/m).map(s => s.trim()).filter(Boolean).map(parseReport);
+};
+
+const formatDuration = (ms: number): string => {
+  if (ms < 1000) return `${ms}ms`;
+  const s = ms / 1000;
+  if (s < 60) return `${s.toFixed(1)}s`;
+  const m = Math.floor(s / 60);
+  const rem = (s - m * 60).toFixed(0);
+  return `${m}m ${rem}s`;
+};
+
+// =============================================================================
+// Logos
+// =============================================================================
+
+const LSIOSeal = ({ size = 80 }: { size?: number }) => (
+  <svg width={size} height={size} viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <linearGradient id="seal-grad" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0%" stopColor="#A100FF" /><stop offset="100%" stopColor="#460073" />
+      </linearGradient>
+      <path id="seal-top-curve" d="M 8 50 A 42 42 0 0 1 92 50" />
+      <path id="seal-bottom-curve" d="M 12 55 A 38 38 0 0 0 88 55" />
+    </defs>
+    <circle cx="50" cy="50" r="46" fill="none" stroke="url(#seal-grad)" strokeWidth="2" />
+    <circle cx="50" cy="50" r="40" fill="none" stroke="url(#seal-grad)" strokeWidth="0.5" />
+    <path d="M50 22 L66 30 L66 50 C66 60 58 68 50 72 C42 68 34 60 34 50 L34 30 Z" fill="url(#seal-grad)" />
+    <path d="M42 49 L48 55 L58 43" stroke="white" strokeWidth="2.5" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+    <text fontSize="6.5" fill="#460073" fontWeight="700" letterSpacing="2">
+      <textPath href="#seal-top-curve" startOffset="50%" textAnchor="middle">LABOUR STANDARDS BUREAU</textPath>
     </text>
-    <text x="50" y="49" fontSize="7" fill="#dc2626" textAnchor="middle">
-      労働基準
-    </text>
-    <text x="50" y="59" fontSize="7" fill="#dc2626" textAnchor="middle">
-      監督署
-    </text>
-    <text x="50" y="72" fontSize="6" fill="#dc2626" textAnchor="middle">
-      OFFICIAL
+    <text fontSize="5" fill="#460073" fontWeight="600" letterSpacing="1.5">
+      <textPath href="#seal-bottom-curve" startOffset="50%" textAnchor="middle">★ OFFICIAL ★ JAPAN ★</textPath>
     </text>
   </svg>
 );
 
-const DC = {
-  correctiveRec: {
-    legalAuthBody:
-      'In accordance with Article 101, Paragraph 1 of the Labour Standards Act, we hereby issue the following corrective recommendation.',
-    legalProv:
-      'Labour Standards Act Article 37: When an employer extends working hours or has workers work on days off, the employer must pay premium wages calculated at a rate not less than 25% above ordinary wages.',
-    findings:
-      'Upon review of wage ledgers and time cards for March 2026, overtime premium wages were not properly paid to 30 workers in the Manufacturing Department.',
-    shortfall:
-      'Total unpaid overtime premium: Approximately ¥1,500,000 affecting 30 workers.',
-    actions: [
-      'Promptly pay the unpaid overtime premium totaling approximately ¥1,500,000 to the 30 affected workers.',
-      'Modify the payroll calculation system to automatically apply the correct premium wage rate for overtime hours.',
-      'Inspect wage payment records for all workers for the past six months and confirm whether similar underpayments exist.',
-    ],
-    notice:
-      'Failure to comply may result in penalties under Article 120 of the Labour Standards Act (fine up to ¥300,000) or referral to the Public Prosecutor for criminal prosecution.',
-    deadline: 'June 26, 2026 (60 days)',
-  },
-  prohibOrder: {
-    legalAuthBody:
-      'Pursuant to Article 98 of the Industrial Safety and Health Act, this Suspension of Use Order is issued due to imminent danger to worker safety.',
-    legalProv:
-      'ISHA Article 20 + Ordinance Article 130: Press machines must be equipped with safety guards meeting prescribed standards to prevent worker injury.',
-    findings:
-      'Press machine ABC-2000 (Serial 12345) on Production Line 3 was operating without required safety guard. Workers actively using equipment — risk of amputation injury.',
-    actions: [
-      'Immediately cease all use of press machine ABC-2000 (S/N 12345).',
-      'Install safety guard meeting ISHA Ordinance Article 130 standards before resuming operation.',
-      'Contact this office for re-inspection before resuming use of the equipment.',
-    ],
-    notice:
-      'Non-compliance constitutes a criminal offense under ISHA Article 119, punishable by imprisonment up to 6 months or fine up to ¥500,000.',
-    deadline: 'Immediate (re-inspection within 30 days)',
-  },
+const LSBLogo = ({ className = "w-5 h-5" }: { className?: string }) => (
+  <svg viewBox="0 0 24 24" className={className} fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M12 1.5L3 5v7c0 5.5 3.8 10.7 9 11.5 5.2-.8 9-6 9-11.5V5l-9-3.5z" fill="#FFFFFF" />
+    <path d="M8 12.5l2.8 2.8L16 10" stroke="#460073" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+  </svg>
+);
+
+const severityTheme = (sev: ParsedReport['severity']) => {
+  switch (sev) {
+    case 'IMMINENT DANGER': return { bg: '#FEF2F2', border: '#FCA5A5', text: '#991B1B', accent: '#DC2626', tableHeader: '#FEE2E2', icon: AlertTriangle };
+    case 'SUBSTANTIVE':     return { bg: '#FFFBEB', border: '#FCD34D', text: '#92400E', accent: '#D97706', tableHeader: '#FEF3C7', icon: AlertCircle };
+    case 'MINOR':           return { bg: '#ECFDF5', border: '#6EE7B7', text: '#065F46', accent: '#059669', tableHeader: '#D1FAE5', icon: Info };
+    case 'ESCALATION':      return { bg: '#F5F0FA', border: '#A100FF', text: '#460073', accent: '#A100FF', tableHeader: '#EDE0F7', icon: ShieldCheck };
+    default:                return { bg: '#F8FAFC', border: '#CBD5E1', text: '#475569', accent: '#64748B', tableHeader: '#F1F5F9', icon: FileText };
+  }
 };
 
-const PDFViewerModal = ({ doc, onClose }) => {
-  const { t } = useT();
-  if (!doc) return null;
-  const data = DC[doc.docKey] || DC.correctiveRec;
-  const isOrder = doc.docKey === 'prohibOrder';
-  const titleKey = isOrder ? 'prohibOrder' : 'correctiveRec';
-  return (
-    <div
-      className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-2 md:p-6 overflow-y-auto"
-      onClick={onClose}
-    >
-      <div
-        className="w-full max-w-4xl bg-white rounded-md shadow-2xl max-h-full flex flex-col"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div
-          className="flex items-center justify-between px-3 md:px-5 py-2.5"
-          style={{ background: C.darkest, color: 'white' }}
-        >
-          <div className="flex items-center gap-2 text-xs md:text-sm font-medium min-w-0">
-            <FileText className="w-4 h-4 flex-shrink-0" />
-            <span className="truncate">
-              {t(titleKey)} · {doc.no}
-            </span>
-          </div>
-          <div className="flex items-center gap-1.5 flex-shrink-0">
-            <button className="p-1.5 hover:bg-white/15 rounded">
-              <Printer className="w-4 h-4" />
-            </button>
-            <button className="p-1.5 hover:bg-white/15 rounded">
-              <Download className="w-4 h-4" />
-            </button>
-            <button
-              onClick={onClose}
-              className="p-1.5 hover:bg-white/15 rounded"
-            >
-              <X className="w-4 h-4" />
-            </button>
-          </div>
-        </div>
-        <div className="overflow-y-auto p-4 md:p-10 bg-slate-100">
-          <div
-            className="bg-white max-w-3xl mx-auto p-6 md:p-12 shadow-md relative"
-            style={{
-              fontFamily: '"Times New Roman", Georgia, serif',
-              minHeight: '70vh',
-            }}
-          >
-            <div className="absolute top-6 right-6 md:top-10 md:right-10 opacity-90">
-              <Seal size={90} />
-            </div>
-            <div
-              className="border-b-4 pb-3 mb-5"
-              style={{ borderColor: C.darkest }}
-            >
-              <h1
-                className="text-xl md:text-3xl font-bold tracking-wide"
-                style={{ color: C.darkest }}
-              >
-                {t(titleKey)}
-              </h1>
-              <div className="text-xs md:text-sm text-slate-600 mt-2 grid grid-cols-2 gap-2">
-                <div>
-                  <strong>{t('documentNo')}:</strong> {doc.no}
-                </div>
-                <div>
-                  <strong>{t('issueDate')}:</strong> April 27, 2026
-                </div>
-              </div>
-            </div>
-            <div className="mb-4">
-              <div
-                className="text-xs font-bold tracking-wider mb-1"
-                style={{ color: C.darkest }}
-              >
-                {t('issuingAuth')}:
-              </div>
-              <div className="text-sm">{INSP.office}</div>
-              <div className="text-sm text-slate-600">{INSP.officeJa}</div>
-              <div className="text-sm mt-1">
-                <em>{t('inspLabel')}:</em> {INSP.name} ({INSP.nameJa})
-              </div>
-            </div>
-            <div className="mb-4">
-              <div
-                className="text-xs font-bold tracking-wider mb-1"
-                style={{ color: C.darkest }}
-              >
-                {t('to')}:
-              </div>
-              <div className="text-sm font-semibold">{CASE.company}</div>
-              <div className="text-sm text-slate-600">{CASE.companyJa}</div>
-              <div className="text-sm">
-                {t('reprDir')}: {CASE.representative}
-              </div>
-              <div className="text-sm">Address: {CASE.address}</div>
-            </div>
-            <div className="mb-4">
-              <div
-                className="text-xs font-bold tracking-wider mb-1"
-                style={{ color: C.darkest }}
-              >
-                {t('legalAuth')}:
-              </div>
-              <p className="text-sm leading-relaxed">{data.legalAuthBody}</p>
-            </div>
-            <div
-              className="mb-4 border-t-2 pt-3"
-              style={{ borderColor: C.lightest }}
-            >
-              <div
-                className="text-sm font-bold tracking-wider mb-2 text-center"
-                style={{ color: C.darkest }}
-              >
-                {t('violsIdent')}
-              </div>
-              <div
-                className="text-sm font-semibold mb-1"
-                style={{ color: C.darkest }}
-              >
-                Item 1:{' '}
-                {isOrder
-                  ? 'ISHA Article 20 + Ordinance Art. 130'
-                  : 'LSA Article 37'}
-              </div>
-              <div className="ml-2 mb-2">
-                <div className="text-xs font-bold mt-2">{t('legalProv')}:</div>
-                <p className="text-xs italic text-slate-700 leading-relaxed">
-                  {data.legalProv}
-                </p>
-              </div>
-              <div className="ml-2 mb-2">
-                <div className="text-xs font-bold mt-2">
-                  {t('factualFind')}:
-                </div>
-                <p className="text-xs leading-relaxed">{data.findings}</p>
-                {data.shortfall && (
-                  <p className="text-xs font-semibold mt-1">{data.shortfall}</p>
-                )}
-              </div>
-              <div className="ml-2 mb-2">
-                <div className="text-xs font-bold mt-2">{t('reqActions')}:</div>
-                <ol className="list-decimal list-inside text-xs space-y-1 ml-2 leading-relaxed">
-                  {data.actions.map((a, i) => (
-                    <li key={i}>{a}</li>
-                  ))}
-                </ol>
-              </div>
-              <div className="ml-2 text-xs">
-                <strong>{t('corrDeadline')}:</strong> {data.deadline}
-              </div>
-            </div>
-            <div
-              className="border-2 p-3 mb-4 rounded text-xs leading-relaxed"
-              style={{ borderColor: '#dc2626', background: '#fef2f2' }}
-            >
-              <div className="font-bold mb-1" style={{ color: '#dc2626' }}>
-                ⚠ {t('importantNotice')}:
-              </div>
-              <p className="text-slate-700">{data.notice}</p>
-            </div>
-            <div className="mt-5 pt-3 border-t border-slate-300">
-              <div
-                className="text-xs font-bold tracking-wider mb-1"
-                style={{ color: C.darkest }}
-              >
-                {t('contactInfo')}:
-              </div>
-              <div className="text-xs text-slate-600">{INSP.office}</div>
-              <div className="text-xs text-slate-600">
-                3-15-1 Shintoshin, Chuo-ku, Saitama City 330-0081 · Tel:
-                048-600-6204
-              </div>
-              <div className="flex items-end justify-between mt-6">
-                <div>
-                  <div className="text-xs text-slate-500 mb-1">
-                    {t('inspLabel')}
-                  </div>
-                  <div
-                    className="text-sm italic border-b border-slate-400 pb-1 pr-12"
-                    style={{ fontFamily: 'cursive', color: C.darkest }}
-                  >
-                    {INSP.name}
-                  </div>
-                  <div className="text-xs mt-1">{INSP.badge}</div>
-                </div>
-                <div className="text-center">
-                  <Seal size={70} />
-                  <div className="text-[10px] text-slate-500 mt-1">
-                    {t('officialSeal')}
-                  </div>
-                </div>
-              </div>
-            </div>
-            <div className="mt-4 text-center text-[10px] text-slate-400 italic border-t border-slate-200 pt-2">
-              {t('sampleNote')}
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
+// =============================================================================
+// DOCX generation
+// =============================================================================
+
+const ensureScript = (src: string): Promise<void> => {
+  return new Promise((resolve, reject) => {
+    const existing = document.querySelector(`script[src="${src}"]`);
+    if (existing) {
+      if ((existing as HTMLScriptElement & { _loaded?: boolean })._loaded) return resolve();
+      existing.addEventListener('load', () => resolve());
+      existing.addEventListener('error', () => reject(new Error(`Failed: ${src}`)));
+      return;
+    }
+    const s = document.createElement('script');
+    s.src = src;
+    s.crossOrigin = 'anonymous';
+    s.onload = () => { (s as HTMLScriptElement & { _loaded?: boolean })._loaded = true; resolve(); };
+    s.onerror = () => reject(new Error(`Failed: ${src}`));
+    document.head.appendChild(s);
+  });
 };
 
-const LoginScreen = ({ onLogin, lang, setLang }) => {
-  const [role, setRole] = useState('inspector');
-  const [badge, setBadge] = useState('LSI-11-4827');
-  const [pw, setPw] = useState('demo');
-  const t = tFor(lang);
-  useEffect(() => {
-    setBadge(role === 'inspector' ? 'LSI-11-4827' : 'LSI-CHF-2104');
-  }, [role]);
-  const submit = () => {
-    if (badge && pw) onLogin(role);
-  };
-  return (
-    <div
-      className="min-h-screen flex items-center justify-center p-3 md:p-6"
-      style={{
-        fontFamily: FONT,
-        background: `linear-gradient(135deg, ${C.lightest} 0%, white 50%, ${C.lightest} 100%)`,
-      }}
-    >
-      <div className="w-full max-w-5xl grid grid-cols-1 lg:grid-cols-2 bg-white shadow-2xl rounded-lg overflow-hidden">
-        <div
-          className="hidden lg:flex flex-col justify-between p-10 text-white relative overflow-hidden"
-          style={{
-            background: `linear-gradient(160deg, ${C.darkest} 0%, ${C.dark} 60%, ${C.core} 100%)`,
-          }}
-        >
-          <div
-            className="absolute -right-20 -top-20 w-72 h-72 rounded-full opacity-20"
-            style={{ background: C.light }}
-          />
-          <div className="relative z-10">
-            <div className="flex items-center gap-3 mb-8">
-              <div className="w-10 h-10 rounded bg-white/15 flex items-center justify-center">
-                <Stamp className="w-5 h-5" />
-              </div>
-              <div>
-                <div className="text-sm font-semibold tracking-wide">
-                  JAPAN LSB
-                </div>
-                <div className="text-[10px] opacity-80">労働基準監督</div>
-              </div>
-            </div>
-            <h1 className="text-3xl font-semibold leading-tight">
-              {t('platform')}
-            </h1>
-            <p className="text-sm opacity-90 mt-3 max-w-sm">
-              {t('platformDesc')}
-            </p>
-          </div>
-          <div className="relative z-10 grid grid-cols-2 gap-3 text-xs">
-            <div className="border border-white/20 rounded p-3">
-              <div className="text-2xl font-semibold">75%</div>
-              <div className="opacity-80">Time savings</div>
-            </div>
-            <div className="border border-white/20 rounded p-3">
-              <div className="text-2xl font-semibold">+22%</div>
-              <div className="opacity-80">Accuracy gain</div>
-            </div>
-          </div>
-        </div>
-        <div
-          onKeyDown={(e) => e.key === 'Enter' && submit()}
-          className="p-6 md:p-10 flex flex-col justify-center"
-        >
-          <div className="flex items-center justify-between mb-6">
-            <div className="flex items-center gap-2 lg:hidden">
-              <div
-                style={{ background: C.core }}
-                className="w-8 h-8 rounded text-white flex items-center justify-center"
-              >
-                <Stamp className="w-4 h-4" />
-              </div>
-              <div
-                className="text-sm font-semibold"
-                style={{ color: C.darkest }}
-              >
-                Japan LSB
-              </div>
-            </div>
-            <select
-              value={lang}
-              onChange={(e) => setLang(e.target.value)}
-              className="ml-auto text-xs border rounded px-2 py-1.5"
-              style={{ borderColor: C.core, color: C.core }}
-            >
-              {LANGUAGES.map((l) => (
-                <option key={l.code} value={l.code}>
-                  {l.native}
-                </option>
-              ))}
-            </select>
-          </div>
-          <h2 className="text-2xl font-semibold text-slate-900">
-            {t('signIn')}
-          </h2>
-          <p className="text-sm text-slate-500 mt-1">{t('authPersonnel')}</p>
-          <div
-            className="mt-6 grid grid-cols-2 gap-0 border rounded overflow-hidden"
-            style={{ borderColor: C.core }}
-          >
-            {[
-              { id: 'inspector', label: t('inspector'), icon: User },
-              { id: 'admin', label: t('administrator'), icon: ShieldCheck },
-            ].map((r) => {
-              const Icon = r.icon,
-                active = role === r.id;
-              return (
-                <button
-                  type="button"
-                  key={r.id}
-                  onClick={() => setRole(r.id)}
-                  style={active ? { background: C.core, color: 'white' } : {}}
-                  className={`flex items-center justify-center gap-2 py-2.5 text-sm font-medium transition ${
-                    active ? '' : 'text-slate-600 hover:bg-purple-50'
-                  }`}
-                >
-                  <Icon className="w-4 h-4" />
-                  <span>{r.label}</span>
-                </button>
-              );
-            })}
-          </div>
-          <div className="mt-6 space-y-4">
-            <div>
-              <label className="text-xs font-medium text-slate-700 uppercase tracking-wider">
-                {t('badgeId')}
-              </label>
-              <input
-                value={badge}
-                onChange={(e) => setBadge(e.target.value)}
-                style={{ borderColor: C.light }}
-                className="mt-1 w-full px-3 py-2.5 border rounded text-sm focus:outline-none font-mono"
-              />
-            </div>
-            <div>
-              <div className="flex justify-between items-baseline">
-                <label className="text-xs font-medium text-slate-700 uppercase tracking-wider">
-                  {t('password')}
-                </label>
-                <a
-                  className="text-xs hover:underline cursor-pointer"
-                  style={{ color: C.core }}
-                >
-                  {t('forgotPwd')}
-                </a>
-              </div>
-              <input
-                type="password"
-                value={pw}
-                onChange={(e) => setPw(e.target.value)}
-                style={{ borderColor: C.light }}
-                className="mt-1 w-full px-3 py-2.5 border rounded text-sm focus:outline-none"
-              />
-            </div>
-            <label className="flex items-center gap-2 text-xs text-slate-600">
-              <input
-                type="checkbox"
-                defaultChecked
-                style={{ accentColor: C.core }}
-              />
-              {t('rememberDev')}
-            </label>
-            <button
-              type="button"
-              onClick={submit}
-              style={{ background: C.core }}
-              onMouseEnter={(e) => (e.currentTarget.style.background = C.dark)}
-              onMouseLeave={(e) => (e.currentTarget.style.background = C.core)}
-              className="w-full py-3 text-white font-medium rounded text-sm flex items-center justify-center gap-2 transition"
-            >
-              <Lock className="w-4 h-4" />
-              {t('signInSecurely')}
-            </button>
-          </div>
-          <div className="mt-6 pt-5 border-t border-slate-200 text-[11px] text-slate-500">
-            <strong>{t('demoCreds')}</strong> — {t('inspector')}:{' '}
-            <code className="bg-slate-100 px-1 rounded">LSI-11-4827</code> ·{' '}
-            {t('administrator')}:{' '}
-            <code className="bg-slate-100 px-1 rounded">LSI-CHF-2104</code> ·{' '}
-            {t('password')}:{' '}
-            <code className="bg-slate-100 px-1 rounded">demo</code>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
+const findDocxLib = (): AnyObj | null => {
+  const w = window as unknown as AnyObj;
+  if (w.docx && (w.docx as AnyObj).Document) return w.docx as AnyObj;
+  if ((w as AnyObj).Docx && ((w as AnyObj).Docx as AnyObj).Document) return (w as AnyObj).Docx as AnyObj;
+  return null;
 };
 
-const LanguageDropdown = () => {
-  const ctx = useContext(LangCtx);
-  const { lang } = ctx;
-  const [open, setOpen] = useState(false);
-  const current = LANGUAGES.find((l) => l.code === lang);
-  return (
-    <div className="relative">
-      <button
-        onClick={() => setOpen(!open)}
-        className="flex items-center gap-1.5 text-xs px-2 md:px-2.5 py-1.5 border rounded hover:bg-purple-50"
-        style={{ borderColor: C.core, color: C.core }}
-      >
-        <Globe className="w-3.5 h-3.5" />
-        <span className="font-medium hidden sm:inline">{current.native}</span>
-        <ChevronDown className="w-3 h-3" />
-      </button>
-      {open && (
-        <>
-          <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
-          <div
-            className="absolute right-0 top-full mt-1 bg-white border rounded shadow-lg z-20 w-44"
-            style={{ borderColor: C.light }}
-          >
-            {LANGUAGES.map((l) => (
-              <button
-                key={l.code}
-                onClick={() => {
-                  ctx.setLang(l.code);
-                  setOpen(false);
-                }}
-                className={`w-full text-left px-3 py-2 text-xs flex justify-between items-center hover:bg-purple-50 ${
-                  lang === l.code ? 'font-semibold' : ''
-                }`}
-                style={
-                  lang === l.code
-                    ? { background: C.lightest, color: C.darkest }
-                    : {}
-                }
-              >
-                <span>{l.native}</span>
-                <span className="text-slate-400">{l.label}</span>
-              </button>
-            ))}
-          </div>
-        </>
-      )}
-    </div>
-  );
-};
-
-const ProfileDropdown = ({ user, role, goto, onLogout }) => {
-  const { t } = useT();
-  const [open, setOpen] = useState(false);
-  const initial = user.name
-    .split(' ')
-    .map((n) => n[0])
-    .join('')
-    .slice(0, 2);
-  return (
-    <div className="relative">
-      <button
-        onClick={() => setOpen(!open)}
-        className="flex items-center gap-2 px-1.5 py-1 rounded hover:bg-purple-50"
-      >
-        <div
-          style={{ background: C.core }}
-          className="w-7 h-7 rounded-full text-white text-xs font-semibold flex items-center justify-center"
-        >
-          {initial}
-        </div>
-        <ChevronDown className="w-3 h-3 text-slate-500 hidden md:block" />
-      </button>
-      {open && (
-        <>
-          <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
-          <div
-            className="absolute right-0 top-full mt-1 bg-white border rounded shadow-lg z-20 w-64"
-            style={{ borderColor: C.light }}
-          >
-            <div
-              className="p-3 border-b"
-              style={{ borderColor: C.lightest, background: C.lightest + '40' }}
-            >
-              <div className="flex items-center gap-2">
-                <div
-                  style={{ background: C.core }}
-                  className="w-9 h-9 rounded-full text-white text-sm font-semibold flex items-center justify-center"
-                >
-                  {initial}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="text-sm font-semibold text-slate-900 truncate">
-                    {user.name}
-                  </div>
-                  <div className="text-[10px] text-slate-500 truncate">
-                    {user.title}
-                  </div>
-                </div>
-              </div>
-              <Pill tone="purple" className="mt-2">
-                {role === 'admin' ? t('administrator') : t('inspector')} ·{' '}
-                {user.badge}
-              </Pill>
-            </div>
-            <button
-              onClick={() => {
-                goto('profile');
-                setOpen(false);
-              }}
-              className="w-full text-left px-3 py-2 text-xs hover:bg-purple-50 flex items-center gap-2"
-            >
-              <User className="w-3.5 h-3.5" />
-              {t('profile')}
-            </button>
-            <button className="w-full text-left px-3 py-2 text-xs hover:bg-purple-50 flex items-center gap-2">
-              <Settings className="w-3.5 h-3.5" />
-              Settings
-            </button>
-            <button
-              onClick={onLogout}
-              className="w-full text-left px-3 py-2 text-xs hover:bg-red-50 text-red-600 flex items-center gap-2 border-t"
-              style={{ borderColor: C.lightest }}
-            >
-              <LogOut className="w-3.5 h-3.5" />
-              {t('signOut')}
-            </button>
-          </div>
-        </>
-      )}
-    </div>
-  );
-};
-
-const INSPECTOR_NAV = [
-  { id: 'home', label: 'caseQueue', sub: 'allCases', icon: LayoutDashboard },
-  {
-    id: 'briefing',
-    label: 'preInspBriefing',
-    sub: 'planning',
-    icon: FileSearch,
-  },
-  { id: 'live', label: 'liveInspection', sub: 'onSite', icon: Radio },
-  { id: 'review', label: 'violationReview', sub: 'enforcement', icon: Scale },
-  { id: 'issue', label: 'documentIssuance', sub: 'delivery', icon: Send },
-  {
-    id: 'followup',
-    label: 'followUpClosure',
-    sub: 'verification',
-    icon: ClipboardCheck,
-  },
-  { id: 'analytics', label: 'analytics', sub: 'insights', icon: BarChart3 },
-  { id: 'profile', label: 'profile', sub: 'myAccount', icon: User },
-];
-const ADMIN_NAV = [
-  {
-    id: 'admin-home',
-    label: 'officeOverview',
-    sub: 'dashboard',
-    icon: LayoutDashboard,
-  },
-  {
-    id: 'approvals',
-    label: 'approvals',
-    sub: 'criminalRef',
-    icon: ShieldCheck,
-    badge: 3,
-  },
-  { id: 'inspectors', label: 'inspRoster', sub: 'manageTeam', icon: Users },
-  {
-    id: 'admin-analytics',
-    label: 'regAnalytics',
-    sub: 'performance',
-    icon: BarChart3,
-  },
-  { id: 'profile', label: 'profile', sub: 'myAccount', icon: User },
-];
-
-const Sidebar = ({
-  phase,
-  setPhase,
-  completed,
-  role,
-  mobileOpen,
-  setMobileOpen,
-}) => {
-  const { t } = useT();
-  const nav = role === 'admin' ? ADMIN_NAV : INSPECTOR_NAV;
-  return (
-    <>
-      {mobileOpen && (
-        <div
-          className="fixed inset-0 bg-black/50 z-30 md:hidden"
-          onClick={() => setMobileOpen(false)}
-        />
-      )}
-      <aside
-        style={{ background: C.darkest }}
-        className={`text-white flex flex-col flex-shrink-0 fixed md:static z-40 h-full w-60 transition-transform ${
-          mobileOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'
-        }`}
-      >
-        <div className="px-5 py-5 border-b border-white/10 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded bg-white flex items-center justify-center">
-              <Stamp className="w-4 h-4" style={{ color: C.darkest }} />
-            </div>
-            <div>
-              <div className="text-sm font-semibold leading-tight">
-                Japan LSB
-              </div>
-              <div className="text-[10px] opacity-70 leading-tight">
-                労働基準監督
-              </div>
-            </div>
-          </div>
-          <button
-            onClick={() => setMobileOpen(false)}
-            className="md:hidden p-1 hover:bg-white/10 rounded"
-          >
-            <X className="w-4 h-4" />
-          </button>
-        </div>
-        <nav className="flex-1 py-3 overflow-y-auto">
-          {nav.map((p) => {
-            const Icon = p.icon,
-              isActive = phase === p.id,
-              isDone = completed.includes(p.id);
-            return (
-              <button
-                key={p.id}
-                onClick={() => {
-                  setPhase(p.id);
-                  setMobileOpen(false);
-                }}
-                style={
-                  isActive
-                    ? {
-                        background: 'rgba(255,255,255,0.1)',
-                        borderLeftColor: C.core,
-                      }
-                    : { borderLeftColor: 'transparent' }
-                }
-                className={`w-full flex items-center gap-3 px-5 py-3 text-left transition border-l-2 ${
-                  isActive
-                    ? 'text-white'
-                    : 'text-white/70 hover:bg-white/5 hover:text-white'
-                }`}
-              >
-                <div className="relative">
-                  <Icon
-                    className="w-4 h-4"
-                    style={isActive ? { color: C.core } : {}}
-                  />
-                  {isDone && (
-                    <CheckCircle2
-                      className="w-3 h-3 absolute -bottom-1 -right-1 text-emerald-300 rounded-full"
-                      style={{ background: C.darkest }}
-                    />
-                  )}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="text-xs font-medium truncate flex items-center gap-2">
-                    {t(p.label)}
-                    {p.badge && (
-                      <span
-                        className="text-[10px] px-1.5 rounded-full font-semibold"
-                        style={{ background: C.core }}
-                      >
-                        {p.badge}
-                      </span>
-                    )}
-                  </div>
-                  <div className="text-[10px] opacity-60">{t(p.sub)}</div>
-                </div>
-                {isActive && (
-                  <CircleDot className="w-3 h-3" style={{ color: C.core }} />
-                )}
-              </button>
-            );
-          })}
-        </nav>
-        <div className="px-5 py-3 border-t border-white/10 text-[10px] opacity-80">
-          <div>v2.4 · Multimodal Intelligence</div>
-          <div className="opacity-70">© MHLW · 厚生労働省</div>
-        </div>
-      </aside>
-    </>
-  );
-};
-
-const TopBar = ({
-  phase,
-  online,
-  setOnline,
-  user,
-  role,
-  goto,
-  onLogout,
-  setMobileOpen,
-}) => {
-  const { t } = useT();
-  const allNav = [...INSPECTOR_NAV, ...ADMIN_NAV];
-  const current = allNav.find((p) => p.id === phase) || allNav[0];
-  const homeId = role === 'admin' ? 'admin-home' : 'home';
-  const isHome = phase === homeId;
-  const backMap = {
-    briefing: 'home',
-    live: 'briefing',
-    review: 'live',
-    issue: 'review',
-    followup: 'issue',
-    analytics: 'home',
-    profile: homeId,
-    approvals: 'admin-home',
-    inspectors: 'admin-home',
-    'admin-analytics': 'admin-home',
-  };
-  const backTarget = backMap[phase] || homeId;
-  return (
-    <header className="h-14 bg-white border-b border-slate-200 flex items-center justify-between px-2 md:px-4 flex-shrink-0 gap-2">
-      <div className="flex items-center gap-1 md:gap-1.5 min-w-0">
-        <button
-          onClick={() => setMobileOpen(true)}
-          className="p-1.5 hover:bg-purple-50 rounded transition flex-shrink-0"
-        >
-          <Menu className="w-5 h-5" style={{ color: C.darkest }} />
-        </button>
-        <button
-          onClick={() => goto(homeId)}
-          className="flex items-center gap-1.5 px-1.5 py-1 hover:bg-purple-50 rounded transition flex-shrink-0"
-        >
-          <div
-            style={{ background: C.darkest }}
-            className="w-7 h-7 rounded text-white flex items-center justify-center flex-shrink-0"
-          >
-            <Stamp className="w-3.5 h-3.5" />
-          </div>
-          <div className="hidden md:block leading-tight text-left">
-            <div className="text-xs font-semibold" style={{ color: C.darkest }}>
-              Japan LSB
-            </div>
-            <div className="text-[9px] text-slate-500">労働基準監督</div>
-          </div>
-        </button>
-        {!isHome && (
-          <button
-            onClick={() => goto(backTarget)}
-            className="flex items-center gap-0.5 ml-1 px-2 py-1 hover:bg-purple-50 rounded text-xs transition flex-shrink-0"
-            style={{ color: C.core }}
-          >
-            <ChevronLeft className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline font-medium">{t('back')}</span>
-          </button>
-        )}
-        <ChevronRight className="w-3 h-3 text-slate-400 mx-0.5 hidden md:block flex-shrink-0" />
-        <div className="text-sm font-semibold text-slate-800 truncate">
-          {t(current.label)}
-        </div>
-      </div>
-      <div className="flex items-center gap-2 md:gap-3 flex-shrink-0">
-        <button
-          onClick={() => setOnline(!online)}
-          className={`flex items-center gap-1.5 text-xs px-2 py-1 rounded border ${
-            online
-              ? 'border-emerald-200 text-emerald-700 bg-emerald-50'
-              : 'border-amber-200 text-amber-700 bg-amber-50'
-          }`}
-        >
-          {online ? (
-            <Wifi className="w-3 h-3" />
-          ) : (
-            <WifiOff className="w-3 h-3" />
-          )}
-          <span className="hidden sm:inline">
-            {online ? t('online') : t('offline')}
-          </span>
-        </button>
-        <LanguageDropdown />
-        <button className="relative text-slate-400 hover:text-slate-700 hidden sm:block">
-          <Bell className="w-4 h-4" />
-          <span
-            className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full"
-            style={{ background: C.core }}
-          />
-        </button>
-        <ProfileDropdown
-          user={user}
-          role={role}
-          goto={goto}
-          onLogout={onLogout}
-        />
-      </div>
-    </header>
-  );
-};
-
-const HomeScreen = ({ goto }) => {
-  const { t } = useT();
-  const cases = [
-    { ...CASE },
-    {
-      id: 'INS-2026-04812',
-      company: 'Sakuragi Logistics K.K.',
-      companyJa: '桜木ロジスティクス',
-      address: 'Higashino Ward, Saitama',
-      industry: 'Warehousing',
-      employees: 142,
-      riskScore: 64,
-      priority: 'MEDIUM',
-      trigger: 'Annual cycle',
-    },
-    {
-      id: 'INS-2026-04795',
-      company: 'Tonan Foods Inc.',
-      companyJa: '東南食品株式会社',
-      address: 'Higashino Ward, Saitama',
-      industry: 'Food Processing',
-      employees: 56,
-      riskScore: 41,
-      priority: 'LOW',
-      trigger: 'Annual cycle',
-    },
+const loadDocxLib = async (): Promise<AnyObj> => {
+  const cdnUrls = [
+    'https://cdn.jsdelivr.net/npm/docx@8.5.0/build/index.umd.min.js',
+    'https://cdn.jsdelivr.net/npm/docx@8.5.0/build/index.umd.js',
+    'https://unpkg.com/docx@8.5.0/build/index.umd.js'
   ];
-  const stats = [
-    { l: t('todayInsp'), v: 3, sub: '1 high priority', icon: Radio },
-    { l: t('pendingCorr'), v: 7, sub: '2 due this week', icon: Clock },
-    { l: t('overdueRpt'), v: 1, sub: 'Escalation needed', icon: AlertTriangle },
-    {
-      l: t('reInspDue'),
-      v: 2,
-      sub: 'Verification phase',
-      icon: ClipboardCheck,
-    },
-  ];
-  return (
-    <div className="p-4 md:p-6 space-y-5 md:space-y-6">
-      <div>
-        <h1 className="text-xl md:text-2xl font-semibold text-slate-900">
-          {t('goodMorning')}, {INSP.name}
-        </h1>
-        <p className="text-sm text-slate-500 mt-1">
-          {INSP.officeJa} · {INSP.office}
-        </p>
-      </div>
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
-        {stats.map((s) => {
-          const Icon = s.icon;
-          return (
-            <Card key={s.l} className="p-3 md:p-4">
-              <div className="flex items-start justify-between">
-                <div className="min-w-0">
-                  <div className="text-[10px] md:text-xs text-slate-500 uppercase tracking-wider truncate">
-                    {s.l}
-                  </div>
-                  <div className="text-2xl md:text-3xl font-semibold text-slate-900 mt-1 md:mt-2">
-                    {s.v}
-                  </div>
-                  <div className="text-[10px] md:text-xs text-slate-500 mt-1">
-                    {s.sub}
-                  </div>
-                </div>
-                <div
-                  style={{ background: C.core }}
-                  className="w-7 h-7 md:w-8 md:h-8 rounded flex items-center justify-center text-white flex-shrink-0"
-                >
-                  <Icon className="w-4 h-4" />
-                </div>
-              </div>
-            </Card>
-          );
-        })}
-      </div>
-      <Card
-        className="p-4 border-l-4"
-        style={{
-          borderLeftColor: C.core,
-          background: `linear-gradient(90deg, ${C.lightest}40 0%, white 100%)`,
-        }}
-      >
-        <div className="flex items-start gap-3">
-          <div
-            style={{ background: C.core }}
-            className="w-8 h-8 rounded text-white flex items-center justify-center flex-shrink-0"
-          >
-            <Sparkles className="w-4 h-4" />
-          </div>
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 mb-1 flex-wrap">
-              <span className="text-sm font-semibold text-slate-800">
-                {t('dailyPlan')}
-              </span>
-              <Pill tone="green">{t('apprByChief')}</Pill>
-            </div>
-            <p className="text-xs text-slate-600">
-              3 inspections assigned for today based on ML risk scoring,
-              complaint records, and workload balancing.
-            </p>
-          </div>
-        </div>
-      </Card>
-      <div>
-        <SectionTitle
-          icon={Briefcase}
-          title={t('todaysCases')}
-          ja="本日の担当案件"
-        />
-        <div className="space-y-3">
-          {cases.map((c, i) => {
-            const isPrimary = i === 0;
-            const tone =
-              c.priority === 'HIGH'
-                ? 'red'
-                : c.priority === 'MEDIUM'
-                ? 'amber'
-                : 'slate';
-            const priLabel =
-              c.priority === 'HIGH'
-                ? t('highPri')
-                : c.priority === 'MEDIUM'
-                ? t('medPri')
-                : t('lowPri');
-            return (
-              <Card
-                key={c.id}
-                className="p-4 md:p-5"
-                style={isPrimary ? { boxShadow: `0 0 0 2px ${C.core}` } : {}}
-              >
-                <div className="flex flex-col md:flex-row md:items-start gap-3 md:gap-4">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1 flex-wrap">
-                      <Pill tone={tone}>{priLabel}</Pill>
-                      <Pill tone="slate">
-                        <Hash className="w-3 h-3" />
-                        {c.id}
-                      </Pill>
-                      {isPrimary && (
-                        <Pill tone="purpleSolid">{t('upNext')}</Pill>
-                      )}
-                    </div>
-                    <h4 className="text-base font-semibold text-slate-900">
-                      {c.company}
-                    </h4>
-                    <div className="text-xs text-slate-500">{c.companyJa}</div>
-                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 mt-3 text-xs">
-                      <div>
-                        <span className="text-slate-400">
-                          {t('industry')}:{' '}
-                        </span>
-                        <span className="text-slate-700">{c.industry}</span>
-                      </div>
-                      <div>
-                        <span className="text-slate-400">{t('workers')}: </span>
-                        <span className="text-slate-700">{c.employees}</span>
-                      </div>
-                      <div className="col-span-2">
-                        <MapPin className="w-3 h-3 inline mr-1 text-slate-400" />
-                        <span className="text-slate-700">{c.address}</span>
-                      </div>
-                    </div>
-                    <div className="mt-3 text-xs text-slate-500">
-                      <span className="text-slate-400">{t('trigger')}: </span>
-                      {c.trigger} ·{' '}
-                      <span className="text-slate-400">{t('lastInsp')}: </span>
-                      {c.lastInspection || '—'}
-                    </div>
-                  </div>
-                  <div className="flex md:flex-col items-center md:items-end gap-3 justify-between">
-                    <div className="text-right">
-                      <div className="text-[10px] text-slate-500 uppercase tracking-wider">
-                        {t('riskScore')}
-                      </div>
-                      <div
-                        className={`text-2xl md:text-3xl font-bold ${
-                          c.riskScore >= 70
-                            ? 'text-red-600'
-                            : c.riskScore >= 50
-                            ? 'text-amber-600'
-                            : 'text-slate-700'
-                        }`}
-                      >
-                        {c.riskScore}
-                      </div>
-                    </div>
-                    {isPrimary ? (
-                      <PrimaryBtn onClick={() => goto('briefing')}>
-                        {t('openBriefing')}
-                        <ArrowRight className="w-4 h-4" />
-                      </PrimaryBtn>
-                    ) : (
-                      <button className="px-3 py-1.5 border border-slate-300 hover:bg-slate-50 text-slate-700 text-xs rounded">
-                        {t('view')}
-                      </button>
-                    )}
-                  </div>
-                </div>
-              </Card>
-            );
-          })}
-        </div>
-      </div>
-    </div>
-  );
+  let lastErr: Error | null = null;
+  for (const url of cdnUrls) {
+    try {
+      await ensureScript(url);
+      const lib = findDocxLib();
+      if (lib) return lib;
+    } catch (e) {
+      lastErr = e instanceof Error ? e : new Error(String(e));
+    }
+  }
+  throw new Error(`docx.js failed to load: ${lastErr?.message ?? 'unknown'}`);
 };
 
-const BriefingScreen = ({ goto }) => {
-  const { t } = useT();
-  return (
-    <div className="p-4 md:p-6 space-y-5 max-w-6xl">
-      <div className="flex items-start justify-between flex-wrap gap-2">
-        <div>
-          <Pill tone="purpleSolid" className="mb-2">
-            <Sparkles className="w-3 h-3" />
-            {t('aiBriefing')}
-          </Pill>
-          <h2 className="text-lg md:text-xl font-semibold text-slate-900">
-            {CASE.company}
-          </h2>
-          <p className="text-sm text-slate-500">
-            {CASE.companyJa} · {CASE.address}
-          </p>
-        </div>
-        <Pill tone="green">
-          <Wifi className="w-3 h-3" />
-          {t('syncedOff')}
-        </Pill>
-      </div>
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-5">
-        <Card className="p-4">
-          <SectionTitle title={t('entProfile')} ja="事業所情報" />
-          <KV k="Representative" v={CASE.representative} />
-          <KV k={t('industry')} v={CASE.industry} />
-          <KV k={t('workers')} v={CASE.employees} />
-          <KV
-            k={t('riskScore')}
-            v={
-              <span className="text-red-600 font-semibold">
-                {CASE.riskScore} / 100
-              </span>
-            }
-          />
-          <KV k={t('lastInsp')} v={CASE.lastInspection} />
-        </Card>
-        <Card className="p-4 md:col-span-2">
-          <SectionTitle
-            icon={AlertTriangle}
-            title={t('prevViol')}
-            ja="過去の違反歴"
-            right={<Pill tone="amber">⚠ {t('repeatRisk')}</Pill>}
-          />
-          <div className="bg-amber-50 border border-amber-200 rounded p-3 text-xs">
-            <div className="flex items-start gap-2">
-              <AlertCircle className="w-4 h-4 text-amber-700 mt-0.5 flex-shrink-0" />
-              <div>
-                <div className="font-semibold text-amber-900">
-                  LSA Article 37 (2023) — Unpaid Overtime Premium
-                </div>
-                <div className="text-amber-800 mt-1">
-                  Employer submitted correction report claiming compliance.{' '}
-                  <strong>Verify during this inspection.</strong> If same
-                  violation recurs, system will recommend criminal referral
-                  (送検).
-                </div>
-              </div>
-            </div>
-          </div>
-        </Card>
-      </div>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-        <Card className="p-4">
-          <SectionTitle icon={FileCheck} title={t('industryRegs')} />
-          <ul className="text-sm space-y-2">
-            {[
-              { code: 'LSA Art. 32', text: 'Working hours (40 hr/week max)' },
-              { code: 'LSA Art. 36', text: '36 Agreement (45 hr/mo cap)' },
-              { code: 'LSA Art. 37', text: 'Overtime premium (≥1.25×)' },
-              { code: 'LSA Art. 89', text: 'Work rules filed with LSI office' },
-              { code: 'ISHA Art. 20', text: 'Machinery safety guards' },
-            ].map((r) => (
-              <li key={r.code} className="flex items-start gap-2">
-                <input
-                  type="checkbox"
-                  className="mt-1"
-                  defaultChecked
-                  style={{ accentColor: C.core }}
-                />
-                <div>
-                  <span
-                    className="font-mono text-xs text-slate-700 px-1.5 py-0.5 rounded"
-                    style={{ background: C.lightest }}
-                  >
-                    {r.code}
-                  </span>
-                  <span className="ml-2 text-slate-600">{r.text}</span>
-                </div>
-              </li>
-            ))}
-          </ul>
-        </Card>
-        <Card className="p-4">
-          <SectionTitle
-            icon={Sparkles}
-            title={t('suggQs')}
-            right={<Pill tone="purple">{t('aiGen')}</Pill>}
-          />
-          <ol className="text-sm space-y-2 text-slate-700">
-            {[
-              'Has the 2023 overtime premium correction been sustained?',
-              'Current 36 Agreement — what overtime hour limit is specified?',
-              'Are work rules currently filed with this office?',
-              'Walk me through press machine operations on Production Line 3.',
-              'When were annual health examinations last conducted?',
-            ].map((q, i) => (
-              <li key={i} className="flex gap-2">
-                <span
-                  className="font-mono font-semibold flex-shrink-0 px-1.5 rounded text-xs flex items-center"
-                  style={{ background: C.lightest, color: C.darkest }}
-                >
-                  {i + 1}
-                </span>
-                <span>{q}</span>
-              </li>
-            ))}
-          </ol>
-        </Card>
-      </div>
-      <Card className="p-4">
-        <SectionTitle icon={Calendar} title={t('recTiming')} />
-        <div className="flex items-center justify-between flex-wrap gap-2">
-          <div>
-            <div className="text-sm text-slate-700">
-              System suggests <strong>Today, 10:00 – 11:30 AM</strong>
-            </div>
-            <div className="text-xs text-slate-500 mt-1">
-              Manufacturing most active 10am–3pm · ~22 min travel
-            </div>
-          </div>
-          <Pill tone="amber">
-            ⚠ Inspector decides: announced vs unannounced
-          </Pill>
-        </div>
-      </Card>
-      <div className="flex justify-between items-center pt-2">
-        <button
-          onClick={() => goto('home')}
-          className="px-4 py-2 text-sm text-slate-600 hover:text-slate-800 flex items-center gap-1"
-        >
-          <ChevronLeft className="w-4 h-4" />
-          {t('back')}
-        </button>
-        <PrimaryBtn onClick={() => goto('live')}>
-          <Radio className="w-4 h-4" />
-          {t('beginInsp')}
-        </PrimaryBtn>
-      </div>
-    </div>
-  );
-};
-
-const LiveInspectionScreen = ({
-  goto,
-  alerts,
-  setAlerts,
-  violations,
-  setViolations,
-  captures,
-  setCaptures,
-  danger,
-  setDanger,
-  dangerStatus,
-  setDangerStatus,
-  elapsed,
-  paused,
-  setPaused,
-  stopped,
-  setStopped,
-}) => {
-  const { t } = useT();
-  const [showStopConfirm, setShowStopConfirm] = useState(false);
-  const autoTriggeredRef = useRef(false);
-
-  const triggerPhotoDoc = () => {
-    setCaptures((c) => [
-      ...c,
-      { type: 'doc', label: 'Wage ledger Mar 2026', time: '+0:42' },
-    ]);
-    setTimeout(() => {
-      setAlerts((a) => [
-        {
-          id: Date.now(),
-          level: 'amber',
-          source: 'Document Analysis',
-          time: '+0:46',
-          title: 'LSA Article 37 — Unpaid Overtime Premium',
-          body: 'Cross-check shows overtime premium underpaid by ~¥1,500,000 across 30 manufacturing workers.',
-        },
-        ...a,
-      ]);
-      setViolations((v) => [
-        ...v,
-        {
-          id: 'v1',
-          code: 'LSA Art. 37',
-          sev: 'substantive',
-          title: 'Unpaid overtime premium',
-          amount: '¥1,500,000',
-          workers: 30,
-          status: 'pending',
-        },
-      ]);
-    }, 600);
-  };
-  const triggerVoice36 = () => {
-    setCaptures((c) => [
-      ...c,
-      { type: 'voice', label: '36 Agreement interview (1:24)', time: '+2:12' },
-    ]);
-    setTimeout(() => {
-      setAlerts((a) => [
-        {
-          id: Date.now(),
-          level: 'amber',
-          source: 'Voice Analysis',
-          time: '+2:18',
-          title: 'LSA Article 36 — Overtime Cap Exceeded',
-          body: '36 Agreement on file specifies 100 hr/month limit. Legal max is 45 hr/month.',
-        },
-        ...a,
-      ]);
-      setViolations((v) => [
-        ...v,
-        {
-          id: 'v2',
-          code: 'LSA Art. 36',
-          sev: 'substantive',
-          title: '36 Agreement exceeds legal cap',
-          amount: '100 hr vs 45 hr',
-          status: 'pending',
-        },
-      ]);
-    }, 600);
-  };
-  const triggerDanger = () => {
-    setCaptures((c) => [
-      ...c,
-      { type: 'photo', label: 'Press machine ABC-2000, Line 3', time: '+4:08' },
-    ]);
-    setTimeout(() => {
-      setAlerts((a) => [
-        {
-          id: Date.now(),
-          level: 'red',
-          source: 'Hazard Detection',
-          time: '+4:11',
-          title: '🚨 IMMINENT DANGER — Unguarded Press Machine',
-          body: 'Computer vision detected press machine without safety guard. Workers using it — amputation risk. ISHA Art. 20.',
-        },
-        ...a,
-      ]);
-      setViolations((v) => [
-        ...v,
-        {
-          id: 'v3',
-          code: 'ISHA Art. 20',
-          sev: 'imminent',
-          title: 'Unguarded press machine',
-          equipment: 'ABC-2000 S/N 12345',
-          location: 'Line 3',
-          status: 'pending',
-        },
-      ]);
-      setDanger(true);
-    }, 600);
-  };
-  const triggerWorkRules = () => {
-    setCaptures((c) => [
-      ...c,
-      {
-        type: 'doc',
-        label: 'Auto: Enterprise DB query (work rules)',
-        time: '+1:24',
-        auto: true,
-      },
-    ]);
-    setTimeout(() => {
-      setAlerts((a) => [
-        {
-          id: Date.now(),
-          level: 'blue',
-          source: 'Auto DB Check',
-          time: '+1:26',
-          title: 'LSA Article 89 — Work Rules Not on File',
-          body: 'Background check: No work rules registered with Higashino LSI office (87 workers, ≥10 required).',
-        },
-        ...a,
-      ]);
-      setViolations((v) => [
-        ...v,
-        {
-          id: 'v4',
-          code: 'LSA Art. 89',
-          sev: 'minor',
-          title: 'Work rules not filed',
-          status: 'pending',
-        },
-      ]);
-    }, 600);
+const generateDOCX = async (report: ParsedReport, edits: Record<string, string>, lang: Lang = 'en') => {
+  const D = await loadDocxLib() as AnyObj & {
+    Document: AnyFn; Paragraph: AnyFn; TextRun: AnyFn; Table: AnyFn; TableRow: AnyFn; TableCell: AnyFn;
+    Packer: AnyObj; AlignmentType: AnyObj; HeadingLevel: AnyObj; BorderStyle: AnyObj;
+    WidthType: AnyObj; ShadingType: AnyObj;
   };
 
-  // Auto-trigger enterprise database query on screen mount
-  useEffect(() => {
-    if (autoTriggeredRef.current) return;
-    const tm = setTimeout(() => {
-      if (autoTriggeredRef.current) return;
-      autoTriggeredRef.current = true;
-      triggerWorkRules();
-    }, 1800);
-    return () => clearTimeout(tm);
-    // eslint-disable-next-line
-  }, []);
+  const merge = (key: string, fallback: string) => edits[key] ?? fallback;
+  const accentHex = report.severity === 'IMMINENT DANGER' ? 'B91C1C'
+                  : report.severity === 'SUBSTANTIVE' ? 'B45309'
+                  : report.severity === 'MINOR' ? '047857' : '460073';
 
-  const handleAskAI = () => {
-    alert('Ask AI Agent — destination to be configured in next step');
+  // Decode the appropriate-language seal PNG into a Uint8Array for ImageRun.
+  // Wrapped in try/catch so a failed decode doesn't kill the whole DOCX.
+  let sealBytes: Uint8Array | null = null;
+  try {
+    const sealBase64 = lang === 'ja' ? SEAL_PNG_BASE64_JA : SEAL_PNG_BASE64;
+    const binStr = atob(sealBase64);
+    sealBytes = new Uint8Array(binStr.length);
+    for (let i = 0; i < binStr.length; i++) sealBytes[i] = binStr.charCodeAt(i);
+  } catch (e) {
+    console.warn('Seal image decode failed; DOCX will render without stamp', e);
+  }
+
+  // Per-language fixed strings inside the DOCX letterhead/closing
+  const ds = lang === 'ja' ? {
+    letterheadTop: '労働基準監督署',
+    dateOfIssue: '発行日:',
+    referenceNo: '整理番号:',
+    to: '宛先,',
+    attention: '担当者:',
+    subject: '件名: ',
+    issuedUnder1: ' (',
+    issuedUnder2: '労働基準法',
+    issuedUnder3: ' および ',
+    issuedUnder4: '労働安全衛生法',
+    issuedUnder5: ' に基づき発行)',
+    sirMadam: '拝啓',
+    closingPara: '本通知の内容を確認し、記載された是正措置および期限に従って対応してください。本通知に従わない場合、関係法令に基づきさらなる措置がとられる可能性があります。',
+    yoursFaithfully: '敬具',
+    onBehalf: '労働基準監督署を代表して、',
+    signatureCaption: '(監督官署名)',
+    issuedBy: '発行者',
+    badgeNo: '監督官バッジ番号: ',
+    classification: '分類 — 重大度: ',
+    documentTypeDisplay: docTypeDisplay(report.documentType, 'ja'),
+    severityDisplay: sevDisplay(report.severity, 'ja')
+  } : {
+    letterheadTop: 'LABOUR STANDARDS INSPECTION BUREAU',
+    dateOfIssue: 'Date of Issue: ',
+    referenceNo: 'Reference No: ',
+    to: 'TO,',
+    attention: 'Attention: ',
+    subject: 'SUBJECT: ',
+    issuedUnder1: ' issued under the ',
+    issuedUnder2: 'Labour Standards Act ',
+    issuedUnder3: 'and the ',
+    issuedUnder4: 'Industrial Safety and Health Act',
+    issuedUnder5: '.',
+    sirMadam: 'Sir/Madam,',
+    closingPara: 'You are required to take note of the contents of this notice and act in accordance with the corrective measures and timelines specified herein. Failure to comply may result in further action under the applicable legal provisions.',
+    yoursFaithfully: 'Yours faithfully,',
+    onBehalf: 'For and on behalf of the Labour Standards Inspection Bureau,',
+    signatureCaption: '(Signature of Inspector)',
+    issuedBy: 'ISSUED BY',
+    badgeNo: 'Inspector Badge No.: ',
+    classification: 'CLASSIFICATION — SEVERITY: ',
+    documentTypeDisplay: report.documentType,
+    severityDisplay: report.severity ?? 'UNKNOWN'
   };
 
-  const setVStatus = (id, status) =>
-    setViolations((vs) => vs.map((v) => (v.id === id ? { ...v, status } : v)));
-  const issueOrder = () => {
-    setVStatus('v3', 'order_issued');
-    setDangerStatus('issued');
-    setDanger(false);
-  };
-  const rejectOrder = () => {
-    setVStatus('v3', 'rejected');
-    setDangerStatus('rejected');
-    setDanger(false);
-  };
-  const allDecided =
-    violations.length >= 4 && violations.every((v) => v.status !== 'pending');
-  const aiActive = !paused && !stopped;
 
-  return (
-    <div className="flex flex-col md:flex-row md:h-full md:overflow-hidden">
-      <style>{`
-        @keyframes aiGlowPulse {
-          0%, 100% {
-            box-shadow: 0 0 0 0 rgba(161, 0, 255, 0.55), 0 0 24px 4px rgba(161, 0, 255, 0.45), 0 0 48px 8px rgba(117, 0, 192, 0.25), inset 0 0 20px rgba(255, 255, 255, 0.08);
-          }
-          50% {
-            box-shadow: 0 0 0 8px rgba(161, 0, 255, 0), 0 0 36px 8px rgba(161, 0, 255, 0.75), 0 0 72px 16px rgba(117, 0, 192, 0.45), inset 0 0 30px rgba(255, 255, 255, 0.18);
-          }
-        }
-        @keyframes aiShimmer {
-          0% { transform: translateX(-120%) skewX(-20deg); }
-          100% { transform: translateX(220%) skewX(-20deg); }
-        }
-        @keyframes aiSparkleRotate {
-          0%, 100% { transform: rotate(0deg) scale(1); opacity: 1; }
-          50% { transform: rotate(180deg) scale(1.15); opacity: 0.85; }
-        }
-        @keyframes aiFloatDot {
-          0%, 100% { transform: translateY(0) scale(1); opacity: 0.6; }
-          50% { transform: translateY(-3px) scale(1.3); opacity: 1; }
-        }
-        @keyframes aiGradientShift {
-          0%, 100% { background-position: 0% 50%; }
-          50% { background-position: 100% 50%; }
-        }
-      `}</style>
+  const { Document, Paragraph, TextRun, Table, TableRow, TableCell, AlignmentType, BorderStyle, WidthType, ShadingType, Packer } = D;
 
-      <div className="flex-1 min-w-0 p-4 md:p-6 overflow-y-auto">
-        <div
-          style={{ background: C.darkest }}
-          className="text-white rounded-md p-3 flex items-center justify-between mb-4 flex-wrap gap-2"
-        >
-          <div className="flex items-center gap-2 md:gap-4 text-xs flex-wrap">
-            <span className="flex items-center gap-1.5">
-              <MapPin className="w-3 h-3" style={{ color: C.core }} />
-              35.83°N, 139.72°E
-            </span>
-            <span className="opacity-50 hidden md:inline">·</span>
-            <span className="hidden md:inline">GPS: Hanamura Kikai site</span>
-            <span className="opacity-50">·</span>
-            <span className="flex items-center gap-1.5">
-              <Clock className="w-3 h-3" />
-              {elapsed}
-            </span>
-          </div>
-          <div className="flex items-center gap-2">
-            {!stopped && (
-              <>
-                <span
-                  className={`w-2 h-2 rounded-full ${
-                    paused ? 'bg-amber-300' : 'bg-red-400 animate-pulse'
-                  }`}
-                />
-                <span className="text-xs font-semibold tracking-wider">
-                  {paused ? 'PAUSED' : t('recording')}
-                </span>
-                <button
-                  onClick={() => setPaused(!paused)}
-                  className="ml-2 flex items-center gap-1 px-2 py-1 bg-white/15 hover:bg-white/25 rounded text-xs transition"
-                >
-                  {paused ? (
-                    <>
-                      <Play className="w-3 h-3" />
-                      Resume
-                    </>
-                  ) : (
-                    <>
-                      <Pause className="w-3 h-3" />
-                      Pause
-                    </>
-                  )}
-                </button>
-                <button
-                  onClick={() => setShowStopConfirm(true)}
-                  className="flex items-center gap-1 px-2 py-1 bg-red-500/80 hover:bg-red-500 rounded text-xs transition"
-                >
-                  <Square className="w-3 h-3 fill-white" />
-                  Stop
-                </button>
-              </>
-            )}
-            {stopped && (
-              <>
-                <span className="w-2 h-2 rounded-full bg-slate-300" />
-                <span className="text-xs font-semibold tracking-wider">
-                  STOPPED
-                </span>
-              </>
-            )}
-          </div>
-        </div>
+  const blank = (before = 0, after = 0) => new (Paragraph as AnyFn)({ children: [], spacing: { before, after } });
+  const ruleLine = () => new (Paragraph as AnyFn)({
+    border: { bottom: { color: '460073', size: 8, style: (BorderStyle as AnyObj).SINGLE, space: 1 } },
+    spacing: { after: 200 }
+  });
+  const centeredRun = (text: string, opts: AnyObj = {}) =>
+    new (Paragraph as AnyFn)({
+      alignment: (AlignmentType as AnyObj).CENTER,
+      children: [new (TextRun as AnyFn)({ text, ...opts })]
+    });
 
-        {showStopConfirm && (
-          <div
-            className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4"
-            onClick={() => setShowStopConfirm(false)}
-          >
-            <Card
-              className="p-6 max-w-md w-full"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="flex items-start gap-3 mb-3">
-                <div className="w-10 h-10 rounded-full bg-red-50 flex items-center justify-center flex-shrink-0">
-                  <Square className="w-5 h-5 text-red-600 fill-red-600" />
-                </div>
-                <div>
-                  <h3 className="text-base font-semibold text-slate-900">
-                    Stop the inspection?
-                  </h3>
-                  <p className="text-xs text-slate-600 mt-1">
-                    Recording will end. You can still review and confirm
-                    captured violations, but no new evidence can be captured.
-                    This cannot be undone.
-                  </p>
-                </div>
-              </div>
-              <div className="flex justify-end gap-2 mt-4">
-                <RejectBtn
-                  onClick={() => setShowStopConfirm(false)}
-                  className="px-4 py-2"
-                >
-                  {t('cancel')}
-                </RejectBtn>
-                <button
-                  onClick={() => {
-                    setStopped(true);
-                    setPaused(false);
-                    setShowStopConfirm(false);
-                  }}
-                  className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-sm rounded flex items-center gap-2"
-                >
-                  <Square className="w-4 h-4 fill-white" />
-                  Stop inspection
-                </button>
-              </div>
-            </Card>
-          </div>
-        )}
-
-        <SectionTitle
-          icon={Camera}
-          title={t('evidCapture')}
-          right={<Pill tone="purpleSolid">{t('aiAssist')}</Pill>}
-        />
-        <div className="grid grid-cols-3 gap-2 md:gap-3 mb-4">
-          {[
-            {
-              onClick: triggerPhotoDoc,
-              Icon: FileText,
-              label: t('scanDoc'),
-              sub: 'Ledger / agreement',
-            },
-            {
-              onClick: triggerVoice36,
-              Icon: Mic,
-              label: t('voiceNote'),
-              sub: 'NLP scan',
-            },
-            {
-              onClick: triggerDanger,
-              Icon: Camera,
-              label: t('photoWp'),
-              sub: 'Photo/video hazard scan',
-              danger: true,
-            },
-          ].map((b, i) => {
-            const Icon = b.Icon;
-            const disabled = paused || stopped;
-            return (
-              <button
-                key={i}
-                onClick={b.onClick}
-                disabled={disabled}
-                className={`bg-white border-2 rounded-md p-3 md:p-5 flex flex-col items-center gap-1 md:gap-2 transition disabled:opacity-40 disabled:cursor-not-allowed ${
-                  b.danger
-                    ? 'border-red-300 hover:border-red-600 hover:bg-red-50'
-                    : 'hover:bg-purple-50'
-                }`}
-                style={!b.danger ? { borderColor: C.core } : {}}
-              >
-                <Icon
-                  className="w-5 h-5 md:w-6 md:h-6"
-                  style={{ color: b.danger ? '#dc2626' : C.core }}
-                />
-                <div
-                  className={`text-xs md:text-sm font-semibold ${
-                    b.danger ? 'text-red-800' : 'text-slate-800'
-                  }`}
-                >
-                  {b.label}
-                </div>
-                <div
-                  className={`text-[10px] text-center ${
-                    b.danger ? 'text-red-600' : 'text-slate-500'
-                  } hidden md:block`}
-                >
-                  {b.sub}
-                </div>
-              </button>
-            );
-          })}
-        </div>
-
-        {/* ★ ASK AI AGENT — Hero CTA */}
-        <div className="relative mb-6 mt-2">
-          <div
-            className="absolute -top-2 left-4 z-10 px-2 py-0.5 text-[9px] font-bold tracking-widest rounded-full text-white flex items-center gap-1"
-            style={{
-              background: C.darkest,
-              boxShadow: '0 2px 8px rgba(70, 0, 115, 0.4)',
-            }}
-          >
-            <Sparkles className="w-2.5 h-2.5" /> RECOMMENDED
-          </div>
-          <button
-            onClick={handleAskAI}
-            disabled={!aiActive}
-            className="w-full relative overflow-hidden rounded-xl disabled:opacity-40 disabled:cursor-not-allowed group transition-transform hover:scale-[1.01] active:scale-[0.99]"
-            style={{
-              animation: aiActive
-                ? 'aiGradientShift 6s ease-in-out infinite'
-                : 'none',
-              background: `linear-gradient(120deg, ${C.darkest} 0%, ${C.dark} 35%, ${C.core} 65%, ${C.dark} 100%)`,
-              backgroundSize: '300% 300%',
-              padding: '20px 24px',
-            }}
-          >
-            {aiActive && (
-              <div className="absolute inset-0 pointer-events-none overflow-hidden">
-                <div
-                  className="absolute top-0 left-0 h-full w-1/3"
-                  style={{
-                    background:
-                      'linear-gradient(90deg, transparent, rgba(255,255,255,0.35), transparent)',
-                    animation: 'aiShimmer 3.2s linear infinite',
-                  }}
-                />
-              </div>
-            )}
-            {aiActive && (
-              <>
-                <span
-                  className="absolute top-3 left-8 w-1 h-1 rounded-full bg-white pointer-events-none"
-                  style={{ animation: 'aiFloatDot 2s ease-in-out infinite' }}
-                />
-                <span
-                  className="absolute top-5 right-12 w-1.5 h-1.5 rounded-full bg-white pointer-events-none"
-                  style={{
-                    animation: 'aiFloatDot 2.5s ease-in-out infinite',
-                    animationDelay: '0.4s',
-                  }}
-                />
-                <span
-                  className="absolute bottom-3 left-1/3 w-1 h-1 rounded-full bg-white pointer-events-none"
-                  style={{
-                    animation: 'aiFloatDot 2.2s ease-in-out infinite',
-                    animationDelay: '0.8s',
-                  }}
-                />
-                <span
-                  className="absolute bottom-4 right-1/4 w-0.5 h-0.5 rounded-full bg-white pointer-events-none"
-                  style={{
-                    animation: 'aiFloatDot 1.8s ease-in-out infinite',
-                    animationDelay: '1.2s',
-                  }}
-                />
-              </>
-            )}
-            <div className="relative flex items-center justify-center gap-3 md:gap-4 text-white">
-              <div className="relative flex-shrink-0">
-                <div
-                  className="absolute inset-0 rounded-full"
-                  style={{
-                    background:
-                      'radial-gradient(circle, rgba(255,255,255,0.5) 0%, transparent 70%)',
-                    filter: 'blur(8px)',
-                  }}
-                />
-                <div
-                  className="relative w-11 h-11 md:w-12 md:h-12 rounded-full flex items-center justify-center"
-                  style={{
-                    background: 'rgba(255,255,255,0.18)',
-                    backdropFilter: 'blur(8px)',
-                    border: '1.5px solid rgba(255,255,255,0.4)',
-                  }}
-                >
-                  <Bot
-                    className="w-6 h-6 md:w-7 md:h-7"
-                    style={{
-                      animation: aiActive
-                        ? 'aiSparkleRotate 4s ease-in-out infinite'
-                        : 'none',
-                    }}
-                  />
-                </div>
-                <Sparkles
-                  className="w-3.5 h-3.5 absolute -top-1 -right-1 text-yellow-200"
-                  style={{
-                    animation: aiActive
-                      ? 'aiFloatDot 1.5s ease-in-out infinite'
-                      : 'none',
-                    filter: 'drop-shadow(0 0 4px rgba(255,255,150,0.8))',
-                  }}
-                />
-              </div>
-              <div className="flex-1 text-left min-w-0">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="text-base md:text-lg font-bold tracking-wide">
-                    {t('askAiAgent')}
-                  </span>
-                  <span
-                    className="text-[9px] uppercase tracking-widest px-1.5 py-0.5 rounded font-semibold"
-                    style={{ background: 'rgba(255,255,255,0.2)' }}
-                  >
-                    BETA
-                  </span>
-                </div>
-                <div className="text-[11px] md:text-xs opacity-90 mt-0.5 truncate">
-                  {t('askAiSub')} · Live regulations, precedent cases, decision
-                  support
-                </div>
-              </div>
-              <div className="flex items-center gap-1 flex-shrink-0">
-                <MessageSquarePlus className="w-4 h-4 opacity-70 hidden sm:block" />
-                <ArrowRight className="w-5 h-5 transition-transform group-hover:translate-x-1" />
-              </div>
-            </div>
-          </button>
-          {!aiActive && (
-            <div className="text-[10px] text-slate-500 text-center mt-1.5 italic">
-              AI Agent paused while recording is stopped
-            </div>
-          )}
-        </div>
-
-        <SectionTitle icon={FileText} title={t('capturedEv')} />
-        {captures.length === 0 ? (
-          <div
-            className="text-xs text-slate-400 italic py-4 text-center border border-dashed rounded"
-            style={{ borderColor: C.light }}
-          >
-            {t('noEvid')}
-          </div>
-        ) : (
-          <div className="space-y-2 mb-5">
-            {captures.map((c, i) => (
-              <div
-                key={i}
-                className="flex items-center gap-3 bg-white border border-slate-200 rounded p-2.5 text-sm"
-              >
-                {c.type === 'photo' && (
-                  <Camera className="w-4 h-4" style={{ color: C.core }} />
-                )}
-                {c.type === 'voice' && (
-                  <Mic className="w-4 h-4" style={{ color: C.core }} />
-                )}
-                {c.type === 'doc' && (
-                  <FileText className="w-4 h-4" style={{ color: C.core }} />
-                )}
-                <span className="flex-1 text-slate-700 truncate">
-                  {c.label}
-                </span>
-                <span className="text-xs text-slate-400">{c.time}</span>
-                {c.auto ? (
-                  <Pill tone="purple">
-                    <Sparkles className="w-3 h-3" />
-                    Auto
-                  </Pill>
-                ) : (
-                  <Pill tone="green">OCR'd</Pill>
-                )}
-              </div>
-            ))}
-          </div>
-        )}
-
-        <SectionTitle icon={Scale} title={t('detViol')} />
-        {violations.length === 0 ? (
-          <div
-            className="text-xs text-slate-400 italic py-4 text-center border border-dashed rounded"
-            style={{ borderColor: C.light }}
-          >
-            {t('noViol')}
-          </div>
-        ) : (
-          <div className="space-y-2">
-            {violations.map((v) => {
-              const tone =
-                v.sev === 'imminent'
-                  ? 'red'
-                  : v.sev === 'substantive'
-                  ? 'amber'
-                  : 'blue';
-              return (
-                <Card
-                  key={v.id}
-                  className={`p-3 border-l-4 ${
-                    v.sev === 'imminent'
-                      ? 'border-l-red-600'
-                      : v.sev === 'substantive'
-                      ? 'border-l-amber-500'
-                      : 'border-l-blue-500'
-                  }`}
-                >
-                  <div className="flex items-start justify-between gap-3 flex-wrap">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1 flex-wrap">
-                        <Pill tone={tone}>{v.code}</Pill>
-                        <Pill tone="slate">{v.sev.toUpperCase()}</Pill>
-                      </div>
-                      <div className="text-sm font-medium text-slate-800">
-                        {v.title}
-                      </div>
-                      <div className="text-xs text-slate-500 mt-0.5">
-                        {v.amount && <span>{v.amount} </span>}
-                        {v.workers && <span>· {v.workers} workers </span>}
-                        {v.equipment && <span>· {v.equipment} </span>}
-                        {v.location && <span>· {v.location}</span>}
-                      </div>
-                    </div>
-                    <DecisionButtons
-                      onConfirm={() => setVStatus(v.id, 'confirmed')}
-                      onReject={() => setVStatus(v.id, 'rejected')}
-                      status={v.status}
-                    />
-                  </div>
-                </Card>
-              );
-            })}
-          </div>
-        )}
-
-        <div className="flex justify-between items-center pt-6 mt-4 border-t border-slate-200">
-          <button
-            onClick={() => goto('briefing')}
-            className="px-4 py-2 text-sm text-slate-600 hover:text-slate-800 flex items-center gap-1"
-          >
-            <ChevronLeft className="w-4 h-4" />
-            {t('back')}
-          </button>
-          <PrimaryBtn disabled={!allDecided} onClick={() => goto('review')}>
-            {t('completeProc')}
-            <ArrowRight className="w-4 h-4" />
-          </PrimaryBtn>
-        </div>
-      </div>
-
-      <div
-        className="w-full md:w-80 xl:w-96 border-t md:border-t-0 md:border-l flex flex-col flex-shrink-0 md:h-full md:overflow-hidden"
-        style={{ background: C.lightest + '40', borderColor: C.light }}
-      >
-        <div
-          className="px-5 py-3 border-b bg-white"
-          style={{ borderColor: C.light }}
-        >
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Activity className="w-4 h-4" style={{ color: C.core }} />
-              <span className="text-sm font-semibold text-slate-800">
-                {t('rtAlerts')}
-              </span>
-            </div>
-            <Pill tone="purpleSolid">
-              {alerts.length} {t('alerts')}
-            </Pill>
-          </div>
-        </div>
-        {danger && (
-          <div className="bg-red-600 text-white p-4 m-3 rounded-md border border-red-700">
-            <div className="flex items-start gap-2 mb-2">
-              <ShieldAlert className="w-5 h-5 flex-shrink-0 animate-pulse" />
-              <div>
-                <div className="text-sm font-bold tracking-wide">
-                  🚨 EMERGENCY RESPONSE
-                </div>
-                <div className="text-xs opacity-90 mt-0.5">
-                  Suspension of Use Order draft prepared
-                </div>
-              </div>
-            </div>
-            <div className="bg-red-700 rounded p-2 text-xs mb-2">
-              <div className="font-semibold">Verbal script ready:</div>
-              <div className="italic mt-1">
-                "You must immediately cease use of this equipment under ISHA
-                Article 98."
-              </div>
-            </div>
-            <div className="flex gap-2">
-              <button
-                onClick={issueOrder}
-                className="flex-1 bg-white text-red-700 hover:bg-red-50 font-semibold text-xs py-2 rounded flex items-center justify-center gap-1.5"
-              >
-                <Stamp className="w-3.5 h-3.5" />
-                {t('approve')} & Issue
-              </button>
-              <button
-                onClick={rejectOrder}
-                className="flex-1 bg-red-700 text-white hover:bg-red-800 font-semibold text-xs py-2 rounded flex items-center justify-center gap-1.5 border border-red-300"
-              >
-                <X className="w-3.5 h-3.5" />
-                {t('reject')}
-              </button>
-            </div>
-          </div>
-        )}
-        {dangerStatus === 'issued' && (
-          <div className="m-3 rounded-md border border-emerald-300 bg-emerald-50 p-3 text-xs">
-            <div className="flex items-start gap-2">
-              <CheckCircle2 className="w-4 h-4 text-emerald-600 mt-0.5" />
-              <div>
-                <div className="font-semibold text-emerald-900">
-                  Emergency Order Issued
-                </div>
-                <div className="text-emerald-700">
-                  Suspension of Use Order delivered on-site at +4:23
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-        <div className="flex-1 overflow-y-auto p-3 space-y-2">
-          {alerts.length === 0 && (
-            <div className="text-center py-12 text-xs text-slate-400">
-              <Radio className="w-8 h-8 mx-auto mb-2 opacity-40" />
-              <div>{t('waitCap')}</div>
-              <div className="mt-1 opacity-70">
-                Tap capture buttons to simulate
-              </div>
-            </div>
-          )}
-          {alerts.map((a) => {
-            const styles = {
-              red: 'border-red-300 bg-red-50',
-              amber: 'border-amber-300 bg-amber-50',
-              blue: 'border-blue-300 bg-blue-50',
-            }[a.level];
-            const iconCol = {
-              red: 'text-red-600',
-              amber: 'text-amber-600',
-              blue: 'text-blue-600',
-            }[a.level];
-            return (
-              <div
-                key={a.id}
-                className={`border ${styles} rounded p-3 text-xs`}
-              >
-                <div className="flex items-center justify-between mb-1">
-                  <div className="flex items-center gap-1.5">
-                    {a.level === 'red' ? (
-                      <ShieldAlert className={`w-3.5 h-3.5 ${iconCol}`} />
-                    ) : (
-                      <AlertTriangle className={`w-3.5 h-3.5 ${iconCol}`} />
-                    )}
-                    <span className="font-semibold text-slate-700">
-                      {a.source}
-                    </span>
-                  </div>
-                  <span className="text-slate-500">{a.time}</span>
-                </div>
-                <div className="font-semibold text-slate-900 mb-1">
-                  {a.title}
-                </div>
-                <div className="text-slate-700 leading-relaxed">{a.body}</div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-    </div>
-  );
-};
-
-const ViolationReviewScreen = ({
-  goto,
-  docStatuses,
-  setDocStatuses,
-  docTexts,
-  setDocTexts,
-}) => {
-  const { t } = useT();
-  const [pdfDoc, setPdfDoc] = useState(null);
-  const [editingIdx, setEditingIdx] = useState(null);
-  const matrix = [
-    {
-      code: 'LSA Art. 37',
-      title: 'Unpaid overtime premium',
-      sev: 'Substantive',
-      action: 'Corrective Recommendation',
-      actionJa: '是正勧告書',
-      deadline: '60 days',
-      tone: 'amber',
-    },
-    {
-      code: 'LSA Art. 36',
-      title: '36 Agreement exceeds legal cap',
-      sev: 'Substantive',
-      action: 'Corrective Recommendation',
-      actionJa: '是正勧告書',
-      deadline: '30 days',
-      tone: 'amber',
-    },
-    {
-      code: 'ISHA Art. 20',
-      title: 'Unguarded press machine',
-      sev: 'Imminent Danger',
-      action: 'Suspension of Use Order',
-      actionJa: '使用停止命令書',
-      deadline: 'Immediate',
-      tone: 'red',
-      issued: true,
-    },
-    {
-      code: 'LSA Art. 89',
-      title: 'Work rules not on file',
-      sev: 'Minor',
-      action: 'Guidance Report',
-      actionJa: '指導票',
-      deadline: 'Voluntary',
-      tone: 'blue',
-    },
+  const letterhead: AnyObj[] = [
+    centeredRun(ds.letterheadTop, { bold: true, size: 22, color: '460073', characterSpacing: 30 }),
+    centeredRun(merge('issuingOffice', report.issuingOffice).toUpperCase(), { size: 16, color: '6B7280', characterSpacing: 20 }),
+    blank(80, 0),
+    ruleLine(),
+    centeredRun(ds.documentTypeDisplay, { bold: true, size: 36, color: '111827' }),
+    blank(80, 240)
   ];
-  const docs = [
-    {
-      idx: 0,
-      title: 'Corrective Recommendation',
-      ja: '是正勧告書',
-      no: 'SAI-2026-04827-01',
-      code: 'LSA Art. 37',
-      docKey: 'correctiveRec',
-    },
-    {
-      idx: 1,
-      issued: true,
-      title: 'Suspension of Use Order',
-      ja: '使用停止命令書',
-      no: 'SAI-2026-04827-02',
-      code: 'ISHA Art. 20',
-      docKey: 'prohibOrder',
-    },
-    {
-      idx: 2,
-      title: 'Corrective Recommendation',
-      ja: '是正勧告書',
-      no: 'SAI-2026-04827-03',
-      code: 'LSA Art. 36',
-      docKey: 'correctiveRec',
-    },
-    {
-      idx: 3,
-      title: 'Guidance Report',
-      ja: '指導票',
-      no: 'SAI-2026-04827-04',
-      code: 'LSA Art. 89',
-      docKey: 'correctiveRec',
-    },
-  ];
-  const defaultBody = {
-    0: 'Inspection of wage ledgers and time cards (Mar 2026) revealed overtime premium calculated at 1.0× regular rate rather than statutory ≥1.25× for 30 manufacturing workers. Total shortfall: ¥1,500,000.',
-    1: 'Press machine ABC-2000 S/N 12345 on Production Line 3. Cease use until safety guard installed.',
-    2: '36 Agreement on file specifies 100 hr/month overtime ceiling. Statutory limit: 45 hr/month. Renegotiate and refile within 30 days.',
-    3: 'Employers with ≥10 workers must file work rules (就業規則). Please prepare and submit rules covering wages, working hours, leave, and termination.',
-  };
-  const setStatus = (idx, status) =>
-    setDocStatuses((s) => ({ ...s, [idx]: status }));
-  const approvedCount = Object.values(docStatuses).filter(
-    (s) => s === 'approved'
-  ).length;
-  return (
-    <div className="p-4 md:p-6 space-y-5 max-w-7xl">
-      <div>
-        <Pill tone="purpleSolid" className="mb-2">
-          <Scale className="w-3 h-3" />
-          {t('enforcement')}
-        </Pill>
-        <h2 className="text-lg md:text-xl font-semibold text-slate-900">
-          {t('decMatrix')}
-        </h2>
-        <p className="text-sm text-slate-500">
-          Review system recommendations. You must approve every document before
-          issuance.
-        </p>
-      </div>
-      <Card className="overflow-x-auto">
-        <table className="w-full text-sm min-w-[640px]">
-          <thead
-            style={{ background: C.lightest + '60' }}
-            className="text-xs uppercase tracking-wider text-slate-600"
-          >
-            <tr>
-              <th className="px-4 py-3 text-left">{t('article')}</th>
-              <th className="px-4 py-3 text-left">{t('violation')}</th>
-              <th className="px-4 py-3 text-left">{t('severity')}</th>
-              <th className="px-4 py-3 text-left">{t('recAct')}</th>
-              <th className="px-4 py-3 text-left">{t('deadline')}</th>
-              <th className="px-4 py-3 text-left">{t('status')}</th>
-            </tr>
-          </thead>
-          <tbody>
-            {matrix.map((m, i) => {
-              const docStat = docStatuses[i];
-              return (
-                <tr key={i} className="border-t border-slate-100">
-                  <td className="px-4 py-3">
-                    <Pill tone={m.tone}>{m.code}</Pill>
-                  </td>
-                  <td className="px-4 py-3 text-slate-800">{m.title}</td>
-                  <td className="px-4 py-3">
-                    <span
-                      className={`text-xs font-medium ${
-                        m.tone === 'red'
-                          ? 'text-red-700'
-                          : m.tone === 'amber'
-                          ? 'text-amber-700'
-                          : 'text-blue-700'
-                      }`}
-                    >
-                      {m.sev}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3">
-                    <div className="text-slate-800">{m.action}</div>
-                    <div className="text-xs text-slate-500">{m.actionJa}</div>
-                  </td>
-                  <td className="px-4 py-3 text-slate-600">{m.deadline}</td>
-                  <td className="px-4 py-3">
-                    {m.issued ? (
-                      <Pill tone="red">
-                        <Stamp className="w-3 h-3" />
-                        {t('issuedOnSite')}
-                      </Pill>
-                    ) : docStat === 'approved' ? (
-                      <Pill tone="green">
-                        <CheckCircle2 className="w-3 h-3" />
-                        {t('approved')}
-                      </Pill>
-                    ) : docStat === 'rejected' ? (
-                      <Pill tone="slate">
-                        <X className="w-3 h-3" />
-                        {t('rejected')}
-                      </Pill>
-                    ) : (
-                      <Pill tone="slate">{t('awaitRev')}</Pill>
-                    )}
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </Card>
-      <Card className="p-4 border-l-4 border-l-amber-500 bg-amber-50/50">
-        <div className="flex items-start gap-3">
-          <AlertTriangle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
-          <div className="flex-1">
-            <div className="font-semibold text-amber-900 text-sm">
-              ⚠ Repeat Violation Risk Note
-            </div>
-            <p className="text-xs text-amber-800 mt-1">
-              LSA Article 37 was previously violated (2023). Today's evidence
-              shows continued underpayment.{' '}
-              <strong>
-                System will escalate to criminal referral (送検) if pattern
-                continues.
-              </strong>
-            </p>
-          </div>
-        </div>
-      </Card>
-      <SectionTitle
-        icon={FileText}
-        title={t('draftDocs')}
-        ja="行政指導文書(下書き)"
-        right={<Pill tone="purple">{t('genaiDr')}</Pill>}
-      />
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-5">
-        {docs.map((d, i) => {
-          const stat = docStatuses[d.idx];
-          const isApproved = stat === 'approved';
-          const isRejected = stat === 'rejected';
-          const isIssued = d.issued;
-          const body = docTexts[d.idx] || defaultBody[d.idx];
-          const isEditing = editingIdx === d.idx;
-          return (
-            <Card
-              key={i}
-              className="p-4 md:p-5"
-              style={isIssued ? { borderColor: '#fecaca' } : {}}
-            >
-              <div className="flex items-start justify-between mb-3 gap-2 flex-wrap">
-                <div className="min-w-0">
-                  <div
-                    className="text-[10px] uppercase tracking-wider"
-                    style={{ color: isIssued ? '#dc2626' : C.core }}
-                  >
-                    Document #{i + 1} {isIssued && '· Issued On-Site'}
-                  </div>
-                  <div className="text-sm font-semibold text-slate-900">
-                    {d.title}
-                  </div>
-                  <div className="text-xs text-slate-500">
-                    {d.ja} · {d.no} · {d.code}
-                  </div>
-                </div>
-                {isIssued ? (
-                  <Pill tone="red">
-                    <Stamp className="w-3 h-3" />
-                    Issued
-                  </Pill>
-                ) : isApproved ? (
-                  <Pill tone="green">✓ {t('approved')}</Pill>
-                ) : isRejected ? (
-                  <Pill tone="slate">
-                    <X className="w-3 h-3" />
-                    {t('rejected')}
-                  </Pill>
-                ) : (
-                  <Pill tone="slate">{t('draft')}</Pill>
-                )}
-              </div>
-              {isEditing ? (
-                <textarea
-                  value={body}
-                  onChange={(e) =>
-                    setDocTexts((prev) => ({
-                      ...prev,
-                      [d.idx]: e.target.value,
-                    }))
-                  }
-                  className="w-full text-xs border rounded p-3 min-h-[140px] font-mono"
-                  style={{ borderColor: C.core }}
-                  autoFocus
-                />
-              ) : (
-                <div
-                  className={`border rounded p-3 text-xs font-mono text-slate-700 max-h-40 overflow-y-auto ${
-                    isIssued
-                      ? 'bg-red-50 border-red-200'
-                      : 'bg-slate-50 border-slate-200'
-                  }`}
-                >
-                  <div className="font-semibold mb-1">{d.code} Violation</div>
-                  <div className="text-[11px] leading-relaxed whitespace-pre-wrap">
-                    {body}
-                  </div>
-                </div>
-              )}
-              {!isIssued &&
-                (isEditing ? (
-                  <div className="flex gap-2 mt-3">
-                    <RejectBtn
-                      onClick={() => setEditingIdx(null)}
-                      className="flex-1"
-                    >
-                      <X className="w-3 h-3" />
-                      {t('cancelEdit')}
-                    </RejectBtn>
-                    <button
-                      onClick={() => setEditingIdx(null)}
-                      style={{ background: C.core, color: 'white' }}
-                      className="flex-1 px-3 py-2 text-xs rounded flex items-center justify-center gap-1 hover:opacity-90"
-                    >
-                      <Check className="w-3 h-3" />
-                      {t('save')}
-                    </button>
-                  </div>
-                ) : (
-                  <div className="flex gap-2 mt-3 flex-wrap">
-                    <button
-                      onClick={() => setEditingIdx(d.idx)}
-                      className="flex-1 min-w-[80px] px-3 py-2 border hover:bg-slate-50 text-slate-700 text-xs rounded flex items-center justify-center gap-1"
-                      style={{ borderColor: '#cbd5e1' }}
-                    >
-                      <Edit3 className="w-3 h-3" />
-                      {t('edit')}
-                    </button>
-                    {isApproved ? (
-                      <button
-                        onClick={() => setPdfDoc({ ...d })}
-                        style={{ background: C.core, color: 'white' }}
-                        className="flex-1 min-w-[110px] px-3 py-2 text-xs rounded flex items-center justify-center gap-1 hover:opacity-90"
-                      >
-                        <Eye className="w-3 h-3" />
-                        {t('viewReport')}
-                      </button>
-                    ) : isRejected ? (
-                      <button
-                        onClick={() => setStatus(d.idx, null)}
-                        className="flex-1 min-w-[80px] px-3 py-2 border border-slate-300 text-slate-700 text-xs rounded hover:bg-slate-50"
-                      >
-                        Reset
-                      </button>
-                    ) : (
-                      <>
-                        <button
-                          onClick={() => setStatus(d.idx, 'approved')}
-                          style={{ background: C.core, color: 'white' }}
-                          className="flex-1 min-w-[100px] px-3 py-2 text-xs rounded flex items-center justify-center gap-1 hover:opacity-90"
-                        >
-                          <PenLine className="w-3 h-3" />
-                          {t('approveAndSign')}
-                        </button>
-                        <RejectBtn onClick={() => setStatus(d.idx, 'rejected')}>
-                          <X className="w-3 h-3" />
-                          {t('reject')}
-                        </RejectBtn>
-                      </>
-                    )}
-                  </div>
-                ))}
-              {isIssued && (
-                <div className="flex items-center justify-between mt-3 gap-2 flex-wrap">
-                  <div className="text-[10px] text-slate-500 flex items-center gap-1">
-                    <CheckCircle2 className="w-3 h-3 text-emerald-600" />
-                    Issued at +4:23 · Acknowledged
-                  </div>
-                  <button
-                    onClick={() => setPdfDoc({ ...d })}
-                    style={{ background: C.core, color: 'white' }}
-                    className="px-3 py-1.5 text-xs rounded flex items-center gap-1 hover:opacity-90"
-                  >
-                    <Eye className="w-3 h-3" />
-                    {t('viewReport')}
-                  </button>
-                </div>
-              )}
-            </Card>
-          );
-        })}
-      </div>
-      <div className="flex justify-between items-center pt-2">
-        <button
-          onClick={() => goto('live')}
-          className="px-4 py-2 text-sm text-slate-600 hover:text-slate-800 flex items-center gap-1"
-        >
-          <ChevronLeft className="w-4 h-4" />
-          {t('back')}
-        </button>
-        <PrimaryBtn onClick={() => goto('issue')} disabled={approvedCount < 2}>
-          {t('procIssue')}
-          <ArrowRight className="w-4 h-4" />
-        </PrimaryBtn>
-      </div>
-      {pdfDoc && (
-        <PDFViewerModal doc={pdfDoc} onClose={() => setPdfDoc(null)} />
-      )}
-    </div>
-  );
-};
 
-const IssuanceScreen = ({ goto, delivered, setDelivered }) => {
-  const { t } = useT();
-  const [method, setMethod] = useState('onsite');
-  const [signed, setSigned] = useState(false);
-  const [pdfDoc, setPdfDoc] = useState(null);
-  const finalize = () => {
-    setSigned(true);
-    setTimeout(() => setDelivered(true), 800);
-  };
-  const docs = [
-    {
-      n: '1',
-      title: 'Corrective Recommendation',
-      ja: '是正勧告書',
-      code: 'LSA Art. 37',
-      docKey: 'correctiveRec',
-      no: 'SAI-2026-04827-01',
-    },
-    {
-      n: '2',
-      title: 'Suspension of Use Order',
-      ja: '使用停止命令書',
-      code: 'ISHA Art. 20',
-      delivered: true,
-      docKey: 'prohibOrder',
-      no: 'SAI-2026-04827-02',
-    },
-    {
-      n: '3',
-      title: 'Corrective Recommendation',
-      ja: '是正勧告書',
-      code: 'LSA Art. 36',
-      docKey: 'correctiveRec',
-      no: 'SAI-2026-04827-03',
-    },
-    {
-      n: '4',
-      title: 'Guidance Report',
-      ja: '指導票',
-      code: 'LSA Art. 89',
-      docKey: 'correctiveRec',
-      no: 'SAI-2026-04827-04',
-    },
-  ];
-  return (
-    <div className="p-4 md:p-6 space-y-5 max-w-5xl">
-      <div>
-        <Pill tone="purpleSolid" className="mb-2">
-          <Send className="w-3 h-3" />
-          {t('delivery')}
-        </Pill>
-        <h2 className="text-lg md:text-xl font-semibold text-slate-900">
-          {t('finDocs')}
-        </h2>
-      </div>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-        <Card className="p-4 md:p-5">
-          <SectionTitle title={t('docsToDel')} />
-          <div className="space-y-2">
-            {docs.map((d) => (
-              <div
-                key={d.n}
-                className="flex items-center gap-3 p-2.5 border border-slate-200 rounded"
-              >
-                <div
-                  style={{ background: C.lightest, color: C.darkest }}
-                  className="w-7 h-7 rounded flex items-center justify-center text-xs font-mono font-semibold flex-shrink-0"
-                >
-                  {d.n}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="text-sm text-slate-800 truncate">
-                    {d.title}
-                  </div>
-                  <div className="text-xs text-slate-500">
-                    {d.ja} · {d.code}
-                  </div>
-                </div>
-                {(d.delivered || delivered) && (
-                  <button
-                    onClick={() => setPdfDoc(d)}
-                    className="px-2 py-1 text-xs flex items-center gap-1 hover:bg-purple-50 rounded"
-                    style={{ color: C.core }}
-                  >
-                    <Eye className="w-3 h-3" />
-                    PDF
-                  </button>
-                )}
-                {d.delivered ? (
-                  <Pill tone="green">{t('issuedOnSite')}</Pill>
-                ) : (
-                  <Pill tone="slate">{t('pending')}</Pill>
-                )}
-              </div>
-            ))}
-          </div>
-        </Card>
-        <Card className="p-4 md:p-5">
-          <SectionTitle title={t('delMethod')} />
-          <div className="space-y-2 mb-4">
-            {[
-              {
-                id: 'onsite',
-                icon: Printer,
-                t: t('onSiteDel'),
-                sub: 'Bluetooth printer + tablet',
-              },
-              {
-                id: 'email',
-                icon: Mail,
-                t: t('emailMail'),
-                sub: 'PDF + sealed paper post',
-              },
-              {
-                id: 'office',
-                icon: Building2,
-                t: t('mailFromOff'),
-                sub: 'Issue from office',
-              },
-            ].map((o) => {
-              const Icon = o.icon,
-                active = method === o.id;
-              return (
-                <button
-                  key={o.id}
-                  onClick={() => setMethod(o.id)}
-                  style={
-                    active
-                      ? { borderColor: C.core, background: C.lightest + '50' }
-                      : { borderColor: '#e2e8f0' }
-                  }
-                  className="w-full text-left p-3 border rounded flex gap-3 transition hover:bg-purple-50"
-                >
-                  <Icon
-                    className="w-4 h-4 mt-0.5 flex-shrink-0"
-                    style={{ color: active ? C.core : '#64748b' }}
-                  />
-                  <div className="flex-1 min-w-0">
-                    <div className="text-sm font-medium text-slate-800">
-                      {o.t}
-                    </div>
-                    <div className="text-xs text-slate-500">{o.sub}</div>
-                  </div>
-                  <input
-                    type="radio"
-                    checked={active}
-                    onChange={() => {}}
-                    style={{ accentColor: C.core }}
-                    className="mt-0.5"
-                  />
-                </button>
-              );
-            })}
-          </div>
-          <div className="border-t border-slate-200 pt-4">
-            <div className="text-xs text-slate-500 mb-2">{t('digSign')}</div>
-            <div
-              className={`border-2 border-dashed rounded p-4 text-center transition ${
-                signed ? 'border-emerald-300 bg-emerald-50' : ''
-              }`}
-              style={!signed ? { borderColor: C.core } : {}}
-            >
-              {signed ? (
-                <div>
-                  <CheckCircle2 className="w-6 h-6 text-emerald-600 mx-auto mb-1" />
-                  <div className="text-xs font-medium text-emerald-800">
-                    Signed: {INSP.name}
-                  </div>
-                  <div className="text-[10px] text-emerald-700">
-                    Tamper-proof PDF generated
-                  </div>
-                </div>
-              ) : (
-                <div>
-                  <PenLine
-                    className="w-6 h-6 mx-auto mb-1"
-                    style={{ color: C.core }}
-                  />
-                  <div className="text-xs text-slate-500">{t('tapSign')}</div>
-                </div>
-              )}
-            </div>
-            {!signed && (
-              <PrimaryBtn onClick={finalize} className="w-full mt-3">
-                <Lock className="w-4 h-4" />
-                {t('signFin')}
-              </PrimaryBtn>
-            )}
-          </div>
-        </Card>
-      </div>
-      {delivered && (
-        <Card className="p-5 border-l-4 border-l-emerald-500">
-          <div className="flex items-start gap-3">
-            <CheckCircle2 className="w-5 h-5 text-emerald-600 mt-0.5 flex-shrink-0" />
-            <div className="flex-1">
-              <div className="font-semibold text-slate-900">{t('docsDel')}</div>
-              <div className="text-xs text-slate-500 mt-0.5">
-                Hanamura-san signed at{' '}
-                {new Date().toLocaleTimeString('en-US', {
-                  hour: '2-digit',
-                  minute: '2-digit',
-                })}
-              </div>
-              <div className="mt-4 grid grid-cols-1 sm:grid-cols-3 gap-3">
-                {[
-                  {
-                    l: t('reminder'),
-                    tt: 'Correction deadline (LSA 37)',
-                    s: 'In 60 days',
-                  },
-                  {
-                    l: t('reminder'),
-                    tt: 'Correction deadline (LSA 36)',
-                    s: 'In 30 days',
-                  },
-                  {
-                    l: t('reInsp'),
-                    tt: 'Verify safety guard',
-                    s: 'Suggested: 14 days',
-                  },
-                ].map((r) => (
-                  <div
-                    key={r.tt}
-                    style={{
-                      background: C.lightest + '50',
-                      borderColor: C.core,
-                    }}
-                    className="border rounded p-3"
-                  >
-                    <div
-                      className="text-[10px] uppercase font-semibold"
-                      style={{ color: C.core }}
-                    >
-                      {r.l}
-                    </div>
-                    <div className="text-sm font-medium text-slate-800 mt-1">
-                      {r.tt}
-                    </div>
-                    <div className="text-xs text-slate-600">{r.s}</div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        </Card>
-      )}
-      <div className="flex justify-between items-center pt-2">
-        <button
-          onClick={() => goto('review')}
-          className="px-4 py-2 text-sm text-slate-600 hover:text-slate-800 flex items-center gap-1"
-        >
-          <ChevronLeft className="w-4 h-4" />
-          {t('back')}
-        </button>
-        <PrimaryBtn onClick={() => goto('followup')} disabled={!delivered}>
-          {t('contFollow')}
-          <ArrowRight className="w-4 h-4" />
-        </PrimaryBtn>
-      </div>
-      {pdfDoc && (
-        <PDFViewerModal doc={pdfDoc} onClose={() => setPdfDoc(null)} />
-      )}
-    </div>
-  );
-};
-
-const FollowUpScreen = ({ goto }) => {
-  const { t } = useT();
-  const [step, setStep] = useState(1);
-  const [closed, setClosed] = useState(false);
-  const [supplemental, setSupplemental] = useState(false);
-  const [reportApprovals, setReportApprovals] = useState({});
-  const [chiefApproved, setChiefApproved] = useState(false);
-  const [showCloseConfirm, setShowCloseConfirm] = useState(false);
-  const [showSubmitted, setShowSubmitted] = useState(false);
-  const items = [
-    {
-      code: 'LSA Art. 37',
-      title: 'Unpaid overtime premium',
-      tone: 'amber',
-      status: 'adequate',
-      requires: 'Pay ¥1,500,000 to 30 workers',
-    },
-    {
-      code: 'ISHA Art. 20',
-      title: 'Press machine safety guard',
-      tone: 'red',
-      status: 'reinsp',
-      requires: 'Install guard on press ABC-2000',
-    },
-    {
-      code: 'LSA Art. 36',
-      title: '36 Agreement renegotiation',
-      tone: 'amber',
-      status: 'adequate',
-      requires: 'Refile within statutory limits',
-    },
-    {
-      code: 'LSA Art. 89',
-      title: 'Work rules filing',
-      tone: 'blue',
-      status: 'adequate',
-      requires: 'File 就業規則 with this office',
-    },
-  ];
-  const setItemStatus = (code, status) =>
-    setReportApprovals((s) => ({ ...s, [code]: status }));
-  const allItemsDecided = items.every((it) => reportApprovals[it.code]);
-  const finalCloseCase = () => {
-    setShowCloseConfirm(false);
-    setClosed(true);
-    setShowSubmitted(true);
-  };
-  return (
-    <div className="p-4 md:p-6 space-y-5 max-w-6xl">
-      <div className="flex items-start justify-between flex-wrap gap-2">
-        <div>
-          <Pill tone="purpleSolid" className="mb-2">
-            <ClipboardCheck className="w-3 h-3" />
-            {t('verifClos')}
-          </Pill>
-          <h2 className="text-lg md:text-xl font-semibold text-slate-900">
-            {t('caseClosure')}
-          </h2>
-          <p className="text-sm text-slate-500">
-            {t('daysSince')} · {t('corrRecv')}
-          </p>
-        </div>
-        {closed && (
-          <Pill tone="green">
-            <CheckCircle2 className="w-3 h-3" />
-            {t('caseClosed')}
-          </Pill>
-        )}
-      </div>
-      {supplemental && (
-        <Card className="p-4 border-l-4 border-l-amber-500 bg-amber-50">
-          <div className="flex items-start gap-3">
-            <Mail className="w-5 h-5 text-amber-700 flex-shrink-0 mt-0.5" />
-            <div className="flex-1">
-              <div className="font-semibold text-amber-900 text-sm">
-                {t('suppReqd')}
-              </div>
-              <p className="text-xs text-amber-800 mt-1">
-                Notice sent to Hanamura-san. New deadline: Jun 25, 2026.
-              </p>
-            </div>
-            <button
-              onClick={() => setSupplemental(false)}
-              className="text-amber-700 hover:text-amber-900"
-            >
-              <X className="w-4 h-4" />
-            </button>
-          </div>
-        </Card>
-      )}
-      <Card className="p-4">
-        <div className="flex items-center justify-between text-xs flex-wrap gap-2">
-          {[
-            { n: 1, label: 'Documents issued', date: 'Apr 27', done: true },
-            { n: 2, label: t('corrRecv'), date: 'Jun 10', done: step >= 1 },
-            { n: 3, label: 'AI verification', date: 'Jun 11', done: step >= 1 },
-            { n: 4, label: t('reInsp'), date: 'Jun 14', done: step >= 2 },
-            { n: 5, label: t('caseClosed'), date: 'Jun 15', done: closed },
-          ].map((s, i, arr) => (
-            <div key={s.n} className="flex items-center flex-1 min-w-[140px]">
-              <div
-                style={
-                  s.done
-                    ? { background: C.core, color: 'white' }
-                    : { background: '#e2e8f0', color: '#64748b' }
-                }
-                className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-semibold flex-shrink-0"
-              >
-                {s.done ? <CheckCircle2 className="w-4 h-4" /> : s.n}
-              </div>
-              <div className="ml-2 flex-1 min-w-0">
-                <div
-                  className={`font-medium truncate ${
-                    s.done ? 'text-slate-800' : 'text-slate-500'
-                  }`}
-                >
-                  {s.label}
-                </div>
-                <div className="text-slate-400">{s.date}</div>
-              </div>
-              {i < arr.length - 1 && (
-                <div
-                  className="h-px flex-1 mx-1"
-                  style={{ background: s.done ? C.core : '#e2e8f0' }}
-                />
-              )}
-            </div>
-          ))}
-        </div>
-      </Card>
-      <Card className="p-4 md:p-5">
-        <SectionTitle
-          icon={FileCheck}
-          title={t('corrVerif')}
-          ja="是正報告書 検証"
-          right={<Pill tone="purple">{t('autoEval')}</Pill>}
-        />
-        <div className="space-y-3">
-          {items.map((it) => {
-            const decided = reportApprovals[it.code];
-            const sevBefore =
-              it.status === 'adequate' ? (
-                <Pill tone="green">
-                  <CheckCircle2 className="w-3 h-3" />
-                  {t('adequate')}
-                </Pill>
-              ) : (
-                <Pill tone="amber">
-                  <Eye className="w-3 h-3" />
-                  {t('reInspRec')}
-                </Pill>
-              );
-            return (
-              <div
-                key={it.code}
-                className={`border rounded p-4 ${
-                  it.status === 'reinsp'
-                    ? 'border-amber-300 bg-amber-50/30'
-                    : 'border-slate-200'
-                }`}
-              >
-                <div className="flex items-start justify-between mb-2 gap-2 flex-wrap">
-                  <div>
-                    <div className="flex items-center gap-2 mb-1 flex-wrap">
-                      <Pill tone={it.tone}>{it.code}</Pill>
-                      <span className="text-sm font-medium text-slate-800">
-                        {it.title}
-                      </span>
-                    </div>
-                    <div className="text-xs text-slate-500">
-                      Required: {it.requires}
-                    </div>
-                  </div>
-                  {sevBefore}
-                </div>
-                {it.code === 'ISHA Art. 20' && (
-                  <div className="grid grid-cols-2 gap-3 mb-3">
-                    <div className="bg-white rounded border border-slate-200 p-2">
-                      <div className="text-[10px] text-slate-500 uppercase mb-1">
-                        Before (Apr 27)
-                      </div>
-                      <div className="aspect-video bg-gradient-to-br from-red-100 to-red-200 rounded flex items-center justify-center">
-                        <div className="text-center text-red-800 text-xs">
-                          <AlertTriangle className="w-6 h-6 mx-auto mb-1" />
-                          Unguarded press
-                        </div>
-                      </div>
-                    </div>
-                    <div className="bg-white rounded border border-slate-200 p-2">
-                      <div className="text-[10px] text-slate-500 uppercase mb-1">
-                        After (Jun 8 — claimed)
-                      </div>
-                      <div className="aspect-video bg-gradient-to-br from-emerald-100 to-emerald-200 rounded flex items-center justify-center">
-                        <div className="text-center text-emerald-800 text-xs">
-                          <ShieldCheck className="w-6 h-6 mx-auto mb-1" />
-                          Guard visible
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                )}
-                <div className="flex items-center justify-between gap-2 flex-wrap pt-2 border-t border-slate-100">
-                  <div className="text-xs text-slate-600">
-                    {decided === 'approved' ? (
-                      <span className="text-emerald-700 font-medium flex items-center gap-1">
-                        <Check className="w-3 h-3" />
-                        You marked this adequate
-                      </span>
-                    ) : decided === 'rejected' ? (
-                      <span className="text-red-700 font-medium flex items-center gap-1">
-                        <X className="w-3 h-3" />
-                        You rejected employer's correction
-                      </span>
-                    ) : (
-                      <span>Inspector decision required</span>
-                    )}
-                  </div>
-                  {!decided ? (
-                    <DecisionButtons
-                      onConfirm={() => setItemStatus(it.code, 'approved')}
-                      onReject={() => setItemStatus(it.code, 'rejected')}
-                      status={null}
-                      confirmLabel={t('approve')}
-                    />
-                  ) : (
-                    <button
-                      onClick={() => setItemStatus(it.code, null)}
-                      className="text-xs hover:underline"
-                      style={{ color: C.core }}
-                    >
-                      Reset decision
-                    </button>
-                  )}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-        {step === 1 && (
-          <div className="mt-4 flex flex-wrap gap-3">
-            <SecondaryBtn onClick={() => setSupplemental(true)}>
-              <Mail className="w-4 h-4" />
-              {t('reqSupp')}
-            </SecondaryBtn>
-            <PrimaryBtn onClick={() => setStep(2)} disabled={!allItemsDecided}>
-              <Calendar className="w-4 h-4" />
-              {t('schedReInsp')}
-            </PrimaryBtn>
-          </div>
-        )}
-      </Card>
-      {step >= 2 && (
-        <Card className="p-5 border-l-4 border-l-emerald-500">
-          <SectionTitle
-            icon={CheckCircle2}
-            title={t('reInspComp')}
-            ja="再監督完了"
-          />
-          <p className="text-sm text-slate-700">
-            Jun 14 site visit confirmed safety guard installed to ISHA standard
-            with operational interlock.
-          </p>
-          {step === 2 && (
-            <PrimaryBtn onClick={() => setStep(3)} className="mt-3">
-              <FileText className="w-4 h-4" />
-              {t('genFinal')}
-            </PrimaryBtn>
-          )}
-        </Card>
-      )}
-      {step >= 3 && (
-        <Card className="p-5">
-          <SectionTitle
-            icon={FileText}
-            title={t('finalRpt')}
-            ja="監督復命書"
-            right={<Pill tone="purple">{t('genaiDr')}</Pill>}
-          />
-          <div className="bg-slate-50 border border-slate-200 rounded p-4 text-xs space-y-2">
-            <div className="flex justify-between border-b border-slate-200 pb-2 flex-wrap gap-2">
-              <div className="font-semibold text-slate-800">
-                監督復命書 · Inspection Completion Report
-              </div>
-              <div className="text-slate-500">SAI-2026-04827-FINAL</div>
-            </div>
-            <KV k="Enterprise" v={`${CASE.company} (${CASE.companyJa})`} />
-            <KV k="Inspection Period" v="Apr 27 – Jun 14, 2026" />
-            <KV k="Violations Found" v="4 (3 substantive + 1 minor)" />
-            <KV
-              k="Outcome"
-              v={
-                <span className="text-emerald-700 font-semibold">
-                  All corrections verified — Compliant
-                </span>
-              }
-            />
-            <KV k="Compliance Rating" v="Fair (improved from Poor)" />
-          </div>
-          {!chiefApproved && !closed && (
-            <div className="mt-4 bg-amber-50 border border-amber-200 rounded p-3 text-xs">
-              <div className="flex items-start gap-2 flex-wrap">
-                <AlertCircle className="w-4 h-4 text-amber-700 mt-0.5 flex-shrink-0" />
-                <div className="flex-1">
-                  <div className="font-semibold text-amber-900">
-                    {t('awaitChief')}
-                  </div>
-                  <div className="text-amber-800">
-                    Chief must review and approve before case closure.
-                  </div>
-                </div>
-                <button
-                  onClick={() => setChiefApproved(true)}
-                  className="text-[10px] underline hover:no-underline ml-auto"
-                  style={{ color: C.darkest }}
-                >
-                  (Demo: simulate Chief approval)
-                </button>
-              </div>
-            </div>
-          )}
-          {chiefApproved && !closed && (
-            <div className="mt-4 bg-emerald-50 border border-emerald-200 rounded p-3 text-xs">
-              <div className="flex items-start gap-2">
-                <CheckCircle2 className="w-4 h-4 text-emerald-600 mt-0.5 flex-shrink-0" />
-                <div>
-                  <div className="font-semibold text-emerald-900">
-                    Chief has approved the final report
-                  </div>
-                  <div className="text-emerald-800">
-                    You may now submit to close the case.
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-          {!closed ? (
-            <PrimaryBtn
-              onClick={() => setShowCloseConfirm(true)}
-              disabled={!chiefApproved}
-              className="mt-4 w-full"
-            >
-              <Stamp className="w-4 h-4" />
-              {t('submitClose')}
-            </PrimaryBtn>
-          ) : (
-            <div className="mt-4 bg-emerald-50 border border-emerald-200 rounded p-4 text-center">
-              <CheckCircle2 className="w-8 h-8 text-emerald-600 mx-auto mb-2" />
-              <div className="text-sm font-semibold text-emerald-900">
-                {t('caseClosed')}
-              </div>
-              <div className="text-xs text-emerald-700 mt-1">
-                All inspection records securely stored. Risk score updated.
-              </div>
-            </div>
-          )}
-        </Card>
-      )}
-      <div className="flex justify-between items-center pt-2">
-        <button
-          onClick={() => goto('issue')}
-          className="px-4 py-2 text-sm text-slate-600 hover:text-slate-800 flex items-center gap-1"
-        >
-          <ChevronLeft className="w-4 h-4" />
-          {t('back')}
-        </button>
-        {closed && (
-          <PrimaryBtn onClick={() => goto('home')}>
-            {t('retQueue')}
-            <ArrowRight className="w-4 h-4" />
-          </PrimaryBtn>
-        )}
-      </div>
-      {showCloseConfirm && (
-        <div
-          className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4"
-          onClick={() => setShowCloseConfirm(false)}
-        >
-          <Card
-            className="p-6 max-w-md w-full"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-start gap-3 mb-3">
-              <div
-                style={{ background: C.lightest }}
-                className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0"
-              >
-                <AlertCircle className="w-5 h-5" style={{ color: C.darkest }} />
-              </div>
-              <div>
-                <h3 className="text-base font-semibold text-slate-900">
-                  Submit and close case?
-                </h3>
-                <p className="text-xs text-slate-600 mt-1">
-                  This submits the final report to MHLW e-Gov and archives all
-                  evidence. <strong>This cannot be undone.</strong>
-                </p>
-              </div>
-            </div>
-            <div className="flex justify-end gap-2 mt-4">
-              <RejectBtn
-                onClick={() => setShowCloseConfirm(false)}
-                className="px-4 py-2"
-              >
-                {t('cancel')}
-              </RejectBtn>
-              <PrimaryBtn onClick={finalCloseCase}>
-                <Stamp className="w-4 h-4" />
-                Confirm & Close
-              </PrimaryBtn>
-            </div>
-          </Card>
-        </div>
-      )}
-      {showSubmitted && (
-        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4">
-          <Card className="p-6 max-w-md w-full text-center">
-            <div
-              className="w-16 h-16 rounded-full mx-auto mb-3 flex items-center justify-center"
-              style={{ background: C.lightest }}
-            >
-              <CheckCircle2 className="w-9 h-9" style={{ color: C.core }} />
-            </div>
-            <h3 className="text-lg font-semibold text-slate-900">
-              Successfully Submitted
-            </h3>
-            <p className="text-sm text-slate-600 mt-2 leading-relaxed">
-              Submitted to <strong>MHLW e-Gov</strong> and saved to the central
-              database.
-            </p>
-            <div className="bg-slate-50 rounded p-3 mt-4 text-xs space-y-1.5 text-left">
-              <div className="flex items-center gap-2">
-                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                <span>
-                  Submission ID:{' '}
-                  <code className="bg-white px-1 rounded font-mono">
-                    EGV-2026-0427-91482
-                  </code>
-                </span>
-              </div>
-              <div className="flex items-center gap-2">
-                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                <span>
-                  Filed at{' '}
-                  {new Date().toLocaleTimeString('en-US', {
-                    hour: '2-digit',
-                    minute: '2-digit',
-                  })}
-                </span>
-              </div>
-            </div>
-            <PrimaryBtn
-              onClick={() => {
-                setShowSubmitted(false);
-                goto('home');
-              }}
-              className="w-full mt-5"
-            >
-              Return to Case Queue
-            </PrimaryBtn>
-          </Card>
-        </div>
-      )}
-    </div>
-  );
-};
-
-const InspectorAnalyticsScreen = () => {
-  const { t } = useT();
-  const monthly = [
-    { m: 'Nov', insp: 12, clos: 9 },
-    { m: 'Dec', insp: 14, clos: 12 },
-    { m: 'Jan', insp: 11, clos: 10 },
-    { m: 'Feb', insp: 15, clos: 13 },
-    { m: 'Mar', insp: 18, clos: 15 },
-    { m: 'Apr', insp: 21, clos: 17 },
-  ];
-  const violationMix = [
-    { name: 'LSA 37', value: 42 },
-    { name: 'LSA 36', value: 28 },
-    { name: 'ISHA 20', value: 18 },
-    { name: 'LSA 89', value: 14 },
-    { name: 'Other', value: 11 },
-  ];
-  const skills = [
-    { skill: 'Wage', value: 92 },
-    { skill: 'Safety', value: 87 },
-    { skill: 'Hours', value: 78 },
-    { skill: 'Health', value: 82 },
-    { skill: 'Foreign', value: 65 },
-    { skill: 'Construction', value: 71 },
-  ];
-  const timeBreakdown = [
-    { phase: 'Manual', site: 120, report: 360, follow: 180 },
-    { phase: 'AI-assisted', site: 90, report: 25, follow: 45 },
-  ];
-  const kpis = [
-    { l: 'Inspections (YTD)', v: '91', d: '+18%', sub: 'vs 2025' },
-    { l: 'Avg. Case Time', v: '2.3 hr', d: '−68%', sub: 'from 7.2 hr' },
-    { l: 'Compliance Rate', v: '83%', d: '+11pp', sub: 'full correction' },
-    { l: 'Detection Accuracy', v: '94%', d: '+22pp', sub: 'vs solo' },
-  ];
-  return (
-    <div className="p-4 md:p-6 space-y-5">
-      <div className="flex items-start justify-between flex-wrap gap-2">
-        <div>
-          <h2 className="text-lg md:text-xl font-semibold text-slate-900">
-            My Performance & Insights
-          </h2>
-          <p className="text-sm text-slate-500">YTD 2026 · {INSP.officeJa}</p>
-        </div>
-        <SecondaryBtn>{t('exportRep')} PDF</SecondaryBtn>
-      </div>
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
-        {kpis.map((k) => (
-          <Card key={k.l} className="p-3 md:p-4">
-            <div className="text-[10px] md:text-xs text-slate-500 uppercase tracking-wider">
-              {k.l}
-            </div>
-            <div className="flex items-baseline gap-2 mt-2 flex-wrap">
-              <div
-                className="text-2xl md:text-3xl font-semibold"
-                style={{ color: C.core }}
-              >
-                {k.v}
-              </div>
-              <div className="text-xs font-semibold flex items-center gap-0.5 text-emerald-600">
-                <ArrowUp className="w-3 h-3" />
-                {k.d}
-              </div>
-            </div>
-            <div className="text-[10px] md:text-[11px] text-slate-500 mt-1">
-              {k.sub}
-            </div>
-          </Card>
-        ))}
-      </div>
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-        <Card className="p-4 md:p-5">
-          <SectionTitle title="Inspections vs Closures" />
-          <ResponsiveContainer width="100%" height={240}>
-            <AreaChart data={monthly}>
-              <defs>
-                <linearGradient id="g1" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor={C.core} stopOpacity={0.5} />
-                  <stop offset="100%" stopColor={C.core} stopOpacity={0.05} />
-                </linearGradient>
-                <linearGradient id="g2" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor={C.darkest} stopOpacity={0.5} />
-                  <stop
-                    offset="100%"
-                    stopColor={C.darkest}
-                    stopOpacity={0.05}
-                  />
-                </linearGradient>
-              </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-              <XAxis dataKey="m" tick={{ fontSize: 11 }} stroke="#94a3b8" />
-              <YAxis tick={{ fontSize: 11 }} stroke="#94a3b8" />
-              <Tooltip />
-              <Legend wrapperStyle={{ fontSize: 11 }} />
-              <Area
-                type="monotone"
-                dataKey="insp"
-                name="Inspections"
-                stroke={C.core}
-                fill="url(#g1)"
-                strokeWidth={2}
-              />
-              <Area
-                type="monotone"
-                dataKey="clos"
-                name="Closures"
-                stroke={C.darkest}
-                fill="url(#g2)"
-                strokeWidth={2}
-              />
-            </AreaChart>
-          </ResponsiveContainer>
-        </Card>
-        <Card className="p-4 md:p-5">
-          <SectionTitle title="Violation Type Mix" />
-          <ResponsiveContainer width="100%" height={240}>
-            <PieChart>
-              <Pie
-                data={violationMix}
-                dataKey="value"
-                nameKey="name"
-                innerRadius={50}
-                outerRadius={90}
-                paddingAngle={2}
-              >
-                {violationMix.map((_, i) => (
-                  <Cell
-                    key={i}
-                    fill={[C.darkest, C.dark, C.core, C.light, C.lightest][i]}
-                  />
-                ))}
-              </Pie>
-              <Tooltip />
-              <Legend wrapperStyle={{ fontSize: 11 }} />
-            </PieChart>
-          </ResponsiveContainer>
-        </Card>
-        <Card className="p-4 md:p-5">
-          <SectionTitle title="Time per Inspection: Manual vs AI" />
-          <ResponsiveContainer width="100%" height={240}>
-            <BarChart data={timeBreakdown} layout="vertical">
-              <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-              <XAxis type="number" tick={{ fontSize: 11 }} stroke="#94a3b8" />
-              <YAxis
-                dataKey="phase"
-                type="category"
-                tick={{ fontSize: 11 }}
-                stroke="#94a3b8"
-                width={90}
-              />
-              <Tooltip />
-              <Legend wrapperStyle={{ fontSize: 11 }} />
-              <Bar dataKey="site" name="On-site" stackId="a" fill={C.darkest} />
-              <Bar dataKey="report" name="Reports" stackId="a" fill={C.core} />
-              <Bar
-                dataKey="follow"
-                name="Follow-up"
-                stackId="a"
-                fill={C.light}
-              />
-            </BarChart>
-          </ResponsiveContainer>
-          <div
-            className="mt-2 text-xs p-2 rounded"
-            style={{ background: C.lightest + '80', color: C.darkest }}
-          >
-            <strong>Net saving: 8.3 hours per case</strong> — equivalent to +1.3
-            cases per day.
-          </div>
-        </Card>
-        <Card className="p-4 md:p-5">
-          <SectionTitle title="Specialization Profile" />
-          <ResponsiveContainer width="100%" height={240}>
-            <RadarChart data={skills}>
-              <PolarGrid stroke="#e2e8f0" />
-              <PolarAngleAxis
-                dataKey="skill"
-                tick={{ fontSize: 11, fill: '#475569' }}
-              />
-              <PolarRadiusAxis
-                angle={90}
-                domain={[0, 100]}
-                tick={{ fontSize: 9 }}
-              />
-              <Radar
-                name="Inspector"
-                dataKey="value"
-                stroke={C.core}
-                fill={C.core}
-                fillOpacity={0.4}
-              />
-              <Tooltip />
-            </RadarChart>
-          </ResponsiveContainer>
-        </Card>
-      </div>
-      <Card className="p-4 md:p-5">
-        <SectionTitle icon={Trophy} title="Recent Achievements" />
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-          {[
-            {
-              i: Award,
-              t: 'Hundred Inspections',
-              s: '100 lifetime inspections',
-              date: 'Apr 12, 2026',
-            },
-            {
-              i: Zap,
-              t: 'Rapid Response',
-              s: '3 emergency orders <30 min',
-              date: 'Mar 2026',
-            },
-            {
-              i: Gauge,
-              t: 'Top Quartile Detection',
-              s: 'Top 25% accuracy',
-              date: 'Q1 2026',
-            },
-          ].map((a) => {
-            const Icon = a.i;
-            return (
-              <div
-                key={a.t}
-                className="border rounded p-3"
-                style={{ borderColor: C.core, background: C.lightest + '40' }}
-              >
-                <Icon className="w-5 h-5 mb-2" style={{ color: C.core }} />
-                <div className="text-sm font-semibold text-slate-900">
-                  {a.t}
-                </div>
-                <div className="text-xs text-slate-600 mt-0.5">{a.s}</div>
-                <div className="text-[10px] text-slate-500 mt-1">{a.date}</div>
-              </div>
-            );
-          })}
-        </div>
-      </Card>
-    </div>
-  );
-};
-
-const ProfileScreen = ({ role }) => {
-  const { t } = useT();
-  const user = role === 'admin' ? ADMIN : INSP;
-  const initial = user.name
-    .split(' ')
-    .map((n) => n[0])
-    .join('')
-    .slice(0, 2);
-  const chain =
-    role === 'admin'
-      ? [
-          {
-            lvl: 'MHLW',
-            name: 'Ministry of Health, Labour & Welfare',
-            ja: '厚生労働省',
-          },
-          {
-            lvl: 'PLB',
-            name: 'Saitama Prefectural Labour Bureau',
-            ja: '埼玉労働局',
-          },
-          { lvl: 'You', name: `${ADMIN.name} — Chief`, ja: 'さいたま署長' },
+  const metaTable = new (Table as AnyFn)({
+    width: { size: 100, type: (WidthType as AnyObj).PERCENTAGE },
+    rows: [
+      new (TableRow as AnyFn)({
+        children: [
+          new (TableCell as AnyFn)({
+            children: [new (Paragraph as AnyFn)({
+              children: [
+                new (TextRun as AnyFn)({ text: ds.dateOfIssue, size: 18, color: '6B7280' }),
+                new (TextRun as AnyFn)({ text: merge('date', report.date), size: 18, color: '111827', bold: true })
+              ]
+            })],
+            borders: { top: { style: (BorderStyle as AnyObj).NONE }, bottom: { style: (BorderStyle as AnyObj).NONE }, left: { style: (BorderStyle as AnyObj).NONE }, right: { style: (BorderStyle as AnyObj).NONE } }
+          }),
+          new (TableCell as AnyFn)({
+            children: [new (Paragraph as AnyFn)({
+              alignment: (AlignmentType as AnyObj).RIGHT,
+              children: [
+                new (TextRun as AnyFn)({ text: ds.referenceNo, size: 18, color: '6B7280' }),
+                new (TextRun as AnyFn)({ text: report.documentNumber, size: 18, color: '111827', bold: true })
+              ]
+            })],
+            borders: { top: { style: (BorderStyle as AnyObj).NONE }, bottom: { style: (BorderStyle as AnyObj).NONE }, left: { style: (BorderStyle as AnyObj).NONE }, right: { style: (BorderStyle as AnyObj).NONE } }
+          })
         ]
-      : [
-          {
-            lvl: 'MHLW',
-            name: 'Ministry of Health, Labour & Welfare',
-            ja: '厚生労働省',
-          },
-          {
-            lvl: 'PLB',
-            name: 'Saitama Prefectural Labour Bureau',
-            ja: '埼玉労働局',
-          },
-          {
-            lvl: 'LSI',
-            name: `${ADMIN.name} — Chief, Saitama LSI`,
-            ja: 'さいたま署長',
-          },
-          {
-            lvl: 'You',
-            name: `${INSP.name} — ${INSP.title}`,
-            ja: '主任監督官',
-          },
-        ];
-  const team =
-    role === 'admin'
-      ? [
-          { name: 'Mochizuki Ren-san', title: 'Senior Inspector', cases: 21 },
-          { name: 'Asahina Mio-san', title: 'Inspector', cases: 18 },
-          { name: 'Sakuragi Daichi-san', title: 'Inspector', cases: 17 },
-          { name: 'Hoshino Kenta-san', title: 'Junior Inspector', cases: 11 },
-        ]
-      : [];
-  return (
-    <div className="p-4 md:p-6 space-y-5 max-w-6xl">
-      <Card
-        className="p-4 md:p-6"
-        style={{
-          background: `linear-gradient(135deg, ${C.lightest}80 0%, white 60%)`,
-        }}
-      >
-        <div className="flex items-start gap-4 md:gap-5 flex-wrap">
-          <div
-            style={{ background: C.core }}
-            className="w-16 h-16 md:w-20 md:h-20 rounded-full text-white text-xl md:text-2xl font-semibold flex items-center justify-center flex-shrink-0"
-          >
-            {initial}
-          </div>
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 flex-wrap">
-              <h2 className="text-lg md:text-xl font-semibold text-slate-900">
-                {user.name}
-              </h2>
-              <Pill tone="purple">{user.nameJa || ''}</Pill>
-            </div>
-            <div className="text-sm text-slate-600 mt-0.5">
-              {user.title} · {user.titleJa || ''}
-            </div>
-            <div className="text-xs text-slate-500 mt-1">
-              {user.office} ({user.officeJa || ''})
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-4 text-xs">
-              <div>
-                <span className="text-slate-500">Badge ID</span>
-                <div className="font-mono font-medium">{user.badge}</div>
-              </div>
-              <div>
-                <span className="text-slate-500">Email</span>
-                <div className="font-medium truncate">{user.email}</div>
-              </div>
-              {user.joined && (
-                <div>
-                  <span className="text-slate-500">Joined</span>
-                  <div className="font-medium">{user.joined}</div>
-                </div>
-              )}
-            </div>
-          </div>
-          <SecondaryBtn>
-            <Edit3 className="w-3 h-3" />
-            {t('edit')}
-          </SecondaryBtn>
-        </div>
-      </Card>
-      <Card className="p-4 md:p-5">
-        <SectionTitle icon={Network} title={t('reportStruct')} />
-        <div className="space-y-2">
-          {chain.map((r, i) => {
-            const isYou = r.lvl === 'You';
-            return (
-              <div
-                key={i}
-                className="flex items-center gap-3"
-                style={{ marginLeft: `${i * 20}px` }}
-              >
-                <div
-                  style={
-                    isYou
-                      ? {
-                          background: C.core,
-                          color: 'white',
-                          borderColor: C.core,
-                        }
-                      : {
-                          borderColor: C.core,
-                          color: C.core,
-                          background: C.lightest + '50',
-                        }
-                  }
-                  className="w-8 h-8 rounded border flex items-center justify-center text-[10px] font-semibold flex-shrink-0"
-                >
-                  {r.lvl}
-                </div>
-                <div
-                  className={`flex-1 px-3 py-2 rounded ${
-                    isYou ? 'border-2' : 'border'
-                  }`}
-                  style={
-                    isYou
-                      ? { borderColor: C.core, background: C.lightest + '40' }
-                      : { borderColor: '#e2e8f0' }
-                  }
-                >
-                  <div className="text-sm font-medium text-slate-800">
-                    {r.name}
-                  </div>
-                  <div className="text-xs text-slate-500">{r.ja}</div>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </Card>
-      {role === 'admin' && team.length > 0 && (
-        <Card className="p-4 md:p-5">
-          <SectionTitle
-            icon={Users}
-            title={t('directRep')}
-            right={
-              <Pill tone="purple">
-                {team.length} {t('inspectors')}
-              </Pill>
-            }
-          />
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            {team.map((tm) => (
-              <div
-                key={tm.name}
-                className="flex items-center gap-3 p-3 border rounded"
-                style={{ borderColor: C.lightest }}
-              >
-                <div
-                  style={{ background: C.core, color: 'white' }}
-                  className="w-9 h-9 rounded-full text-sm font-semibold flex items-center justify-center"
-                >
-                  {tm.name[0]}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="text-sm font-medium text-slate-800">
-                    {tm.name}
-                  </div>
-                  <div className="text-xs text-slate-500">{tm.title}</div>
-                </div>
-                <div className="text-right">
-                  <div className="text-xs text-slate-500">{t('ytdCases')}</div>
-                  <div
-                    className="text-sm font-semibold"
-                    style={{ color: C.core }}
-                  >
-                    {tm.cases}
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </Card>
-      )}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-        <Card className="p-4 md:p-5">
-          <SectionTitle title={t('acctSettings')} />
-          {[
-            'Change password',
-            '2FA',
-            'Notifications',
-            'Language',
-            'Sync settings',
-          ].map((s) => (
-            <button
-              key={s}
-              className="w-full flex items-center justify-between py-2.5 border-b border-slate-100 last:border-0 text-sm text-slate-700 hover:bg-purple-50 px-2 -mx-2 rounded"
-            >
-              <span>{s}</span>
-              <ChevronRight className="w-4 h-4 text-slate-400" />
-            </button>
-          ))}
-        </Card>
-        <Card className="p-4 md:p-5">
-          <SectionTitle title={t('permsAcc')} />
-          <div className="space-y-2 text-sm">
-            {(role === 'admin'
+      })
+    ]
+  });
+
+  const recipientBlock: AnyObj[] = [
+    blank(200, 0),
+    new (Paragraph as AnyFn)({ children: [new (TextRun as AnyFn)({ text: ds.to, size: 22, bold: true, color: '111827' })] }),
+    new (Paragraph as AnyFn)({ indent: { left: 240 }, children: [new (TextRun as AnyFn)({ text: merge('businessName', report.businessName), bold: true, size: 22, color: '111827' })] }),
+    new (Paragraph as AnyFn)({ indent: { left: 240 }, children: [new (TextRun as AnyFn)({ text: merge('businessAddress', report.businessAddress), size: 18, color: '374151' })] }),
+    new (Paragraph as AnyFn)({
+      indent: { left: 240 },
+      children: [
+        new (TextRun as AnyFn)({ text: ds.attention, size: 18, color: '6B7280' }),
+        new (TextRun as AnyFn)({ text: merge('representative', report.representative), size: 18, color: '111827', italics: true })
+      ]
+    }),
+    blank(200, 0)
+  ];
+
+  const subjectLine = [
+    new (Paragraph as AnyFn)({
+      children: [
+        new (TextRun as AnyFn)({ text: ds.subject, size: 20, bold: true, color: '111827' }),
+        new (TextRun as AnyFn)({ text: ds.documentTypeDisplay + ds.issuedUnder1, size: 20, color: '111827' }),
+        new (TextRun as AnyFn)({ text: ds.issuedUnder2, size: 20, italics: true, color: '111827' }),
+        new (TextRun as AnyFn)({ text: ds.issuedUnder3, size: 20, color: '111827' }),
+        new (TextRun as AnyFn)({ text: ds.issuedUnder4, size: 20, italics: true, color: '111827' }),
+        new (TextRun as AnyFn)({ text: ds.issuedUnder5, size: 20, color: '111827' })
+      ]
+    }),
+    blank(120, 0)
+  ];
+
+  const narrativeBlock: AnyObj[] = [
+    new (Paragraph as AnyFn)({ children: [new (TextRun as AnyFn)({ text: ds.sirMadam, size: 20, color: '111827' })] }),
+    blank(80, 0),
+    new (Paragraph as AnyFn)({
+      alignment: (AlignmentType as AnyObj).JUSTIFIED,
+      indent: { firstLine: 360 },
+      children: [new (TextRun as AnyFn)({ text: report.narrative, size: 20, color: '111827' })]
+    }),
+    blank(80, 0),
+    new (Paragraph as AnyFn)({
+      alignment: (AlignmentType as AnyObj).JUSTIFIED,
+      indent: { firstLine: 360 },
+      children: [new (TextRun as AnyFn)({ text: lang === 'ja' ? '本通知の根拠となる事実認定、必要な是正措置、および不遵守の結果は、下記の各表に記載されています。' : 'The findings on which this notice is based, the corrective measures required, and the consequences of non-compliance are set out in the schedules below.', size: 20, color: '111827' })]
+    }),
+    blank(160, 0)
+  ];
+
+  const tableBlocks: AnyObj[] = [];
+  report.sections.forEach((section) => {
+    tableBlocks.push(new (Paragraph as AnyFn)({
+      children: [new (TextRun as AnyFn)({ text: section.title.toUpperCase(), bold: true, size: 20, color: '460073' })],
+      spacing: { before: 200, after: 100 }
+    }));
+    const editedRows = section.rows.map((row, ri) => row.map((cell, ci) => merge(`${section.title}-${ri}-${ci}`, cell)));
+    const headerCells = section.headers.map((h: string) =>
+      new (TableCell as AnyFn)({
+        shading: { fill: accentHex, type: (ShadingType as AnyObj).CLEAR },
+        children: [new (Paragraph as AnyFn)({ children: [new (TextRun as AnyFn)({ text: h, color: 'FFFFFF', bold: true, size: 16 })] })],
+        margins: { top: 100, bottom: 100, left: 120, right: 120 }
+      })
+    );
+    const bodyRows = editedRows.map((row: string[], rIdx: number) =>
+      new (TableRow as AnyFn)({
+        children: row.map((cell: string) =>
+          new (TableCell as AnyFn)({
+            shading: { fill: rIdx % 2 === 0 ? 'FFFFFF' : 'FAF7FE', type: (ShadingType as AnyObj).CLEAR },
+            children: [new (Paragraph as AnyFn)({ children: [new (TextRun as AnyFn)({ text: cell, size: 16, color: '111827' })] })],
+            margins: { top: 100, bottom: 100, left: 120, right: 120 }
+          })
+        )
+      })
+    );
+    tableBlocks.push(new (Table as AnyFn)({
+      width: { size: 100, type: (WidthType as AnyObj).PERCENTAGE },
+      rows: [new (TableRow as AnyFn)({ children: headerCells, tableHeader: true }), ...bodyRows]
+    }));
+    tableBlocks.push(blank(120, 0));
+  });
+
+  const closingBlock: AnyObj[] = [
+    blank(240, 0),
+    new (Paragraph as AnyFn)({
+      alignment: (AlignmentType as AnyObj).JUSTIFIED,
+      indent: { firstLine: 360 },
+      children: [new (TextRun as AnyFn)({ text: ds.closingPara, size: 20, color: '111827' })]
+    }),
+    blank(120, 0),
+    new (Paragraph as AnyFn)({ children: [new (TextRun as AnyFn)({ text: ds.yoursFaithfully, size: 20, color: '111827' })] }),
+    blank(80, 0),
+    new (Paragraph as AnyFn)({ children: [new (TextRun as AnyFn)({ text: ds.onBehalf, size: 18, italics: true, color: '4B5563' })] })
+  ];
+
+  const signatureLinePara = new (Paragraph as AnyFn)({
+    border: { bottom: { color: '111827', size: 8, style: (BorderStyle as AnyObj).SINGLE, space: 1 } },
+    spacing: { before: 600, after: 80 },
+    children: [new (TextRun as AnyFn)({ text: '', size: 20 })]
+  });
+
+  const signatureBlock = new (Table as AnyFn)({
+    width: { size: 100, type: (WidthType as AnyObj).PERCENTAGE },
+    columnWidths: [5400, 4000],
+    rows: [
+      new (TableRow as AnyFn)({
+        children: [
+          new (TableCell as AnyFn)({
+            children: [
+              signatureLinePara,
+              new (Paragraph as AnyFn)({ children: [new (TextRun as AnyFn)({ text: ds.signatureCaption, size: 14, color: '6B7280', italics: true })] }),
+              blank(80, 0),
+              new (Paragraph as AnyFn)({ children: [new (TextRun as AnyFn)({ text: report.inspectorName, bold: true, size: 22, color: '111827' })] }),
+              new (Paragraph as AnyFn)({ children: [new (TextRun as AnyFn)({ text: `${ds.badgeNo}${report.inspectorBadge}`, size: 16, color: '4B5563' })] }),
+              new (Paragraph as AnyFn)({ children: [new (TextRun as AnyFn)({ text: merge('issuingOffice', report.issuingOffice), size: 16, color: '4B5563' })] })
+            ],
+            borders: { top: { style: (BorderStyle as AnyObj).NONE }, bottom: { style: (BorderStyle as AnyObj).NONE }, left: { style: (BorderStyle as AnyObj).NONE }, right: { style: (BorderStyle as AnyObj).NONE } }
+          }),
+          new (TableCell as AnyFn)({
+            children: (sealBytes && (D as AnyObj).ImageRun)
               ? [
-                  { p: 'Approve criminal referrals (送検)', g: true },
-                  { p: 'Add/remove inspectors', g: true },
-                  { p: 'Approve annual inspection plan', g: true },
-                  { p: 'View regional analytics', g: true },
+                  blank(200, 0),
+                  new (Paragraph as AnyFn)({
+                    alignment: (AlignmentType as AnyObj).CENTER,
+                    children: [
+                      new ((D as AnyObj).ImageRun as AnyFn)({
+                        data: sealBytes,
+                        transformation: { width: 110, height: 110 }
+                      })
+                    ]
+                  })
                 ]
               : [
-                  { p: 'Conduct inspections (LSA Art. 101)', g: true },
-                  { p: 'Issue Corrective Recommendations', g: true },
-                  { p: 'Issue Suspension of Use Orders', g: true },
-                  { p: 'Approve criminal referrals', g: false },
-                ]
-            ).map((p) => (
-              <div
-                key={p.p}
-                className="flex items-center justify-between py-1.5 border-b border-slate-100 last:border-0"
-              >
-                <span className="text-slate-700">{p.p}</span>
-                {p.g ? (
-                  <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                ) : (
-                  <X className="w-4 h-4 text-slate-300" />
-                )}
-              </div>
-            ))}
-          </div>
-        </Card>
-      </div>
-    </div>
-  );
-};
-
-const AdminOverview = ({ goto }) => {
-  const monthly = [
-    { m: 'Nov', val: 102 },
-    { m: 'Dec', val: 95 },
-    { m: 'Jan', val: 88 },
-    { m: 'Feb', val: 110 },
-    { m: 'Mar', val: 108 },
-    { m: 'Apr', val: 127 },
-  ];
-  const referrals = [
-    {
-      id: 'CR-26-0014',
-      co: 'Tachibana Kogyo Co., Ltd.',
-      vio: 'LSA Art. 37 (3rd repeat)',
-      urg: 'high',
-    },
-    {
-      id: 'CR-26-0015',
-      co: 'Kurosawa Kensetsu K.K.',
-      vio: 'ISHA Art. 20 — fatal injury',
-      urg: 'critical',
-    },
-    {
-      id: 'CR-26-0016',
-      co: 'Hanamura Kikai Co., Ltd.',
-      vio: 'LSA Art. 37 repeat',
-      urg: 'high',
-    },
-  ];
-  return (
-    <div className="p-4 md:p-6 space-y-5">
-      <div>
-        <h1 className="text-xl md:text-2xl font-semibold text-slate-900">
-          Welcome, {ADMIN.name}
-        </h1>
-        <p className="text-sm text-slate-500 mt-1">
-          {ADMIN.titleJa} · {ADMIN.office}
-        </p>
-      </div>
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
-        {[
-          { l: 'Active Inspectors', v: '14', sub: '2 on leave' },
-          { l: 'Cases (Apr)', v: '127', sub: '+18% vs Mar' },
-          { l: 'Pending Approvals', v: '3', sub: 'Criminal refs' },
-          { l: 'Compliance Rate', v: '81%', sub: 'Region avg' },
-        ].map((k) => (
-          <Card key={k.l} className="p-3 md:p-4">
-            <div className="text-[10px] md:text-xs text-slate-500 uppercase tracking-wider">
-              {k.l}
-            </div>
-            <div
-              className="text-2xl md:text-3xl font-semibold mt-2"
-              style={{ color: C.core }}
-            >
-              {k.v}
-            </div>
-            <div className="text-[10px] md:text-xs text-slate-500 mt-1">
-              {k.sub}
-            </div>
-          </Card>
-        ))}
-      </div>
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-        <Card className="p-4 md:p-5 lg:col-span-2">
-          <SectionTitle
-            title="Monthly Inspection Volume"
-            right={<Pill tone="purple">Office-wide</Pill>}
-          />
-          <ResponsiveContainer width="100%" height={240}>
-            <BarChart data={monthly}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-              <XAxis dataKey="m" tick={{ fontSize: 11 }} stroke="#94a3b8" />
-              <YAxis tick={{ fontSize: 11 }} stroke="#94a3b8" />
-              <Tooltip />
-              <Bar dataKey="val" name="Inspections" radius={[6, 6, 0, 0]}>
-                {monthly.map((_, i) => (
-                  <Cell
-                    key={i}
-                    fill={i === monthly.length - 1 ? C.core : C.dark}
-                  />
-                ))}
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
-        </Card>
-        <Card className="p-4 md:p-5">
-          <SectionTitle
-            icon={ShieldCheck}
-            title="Pending Approvals"
-            right={<Pill tone="red">{referrals.length} new</Pill>}
-          />
-          <div className="space-y-2">
-            {referrals.map((r) => (
-              <div
-                key={r.id}
-                className="border rounded p-2.5 hover:bg-purple-50 cursor-pointer"
-                style={{ borderColor: C.light }}
-                onClick={() => goto('approvals')}
-              >
-                <div className="flex items-center justify-between mb-1">
-                  <span className="text-xs font-mono text-slate-500">
-                    {r.id}
-                  </span>
-                  <Pill tone={r.urg === 'critical' ? 'red' : 'amber'}>
-                    {r.urg}
-                  </Pill>
-                </div>
-                <div className="text-sm font-medium text-slate-800">{r.co}</div>
-                <div className="text-xs text-slate-500">{r.vio}</div>
-              </div>
-            ))}
-          </div>
-          <PrimaryBtn className="w-full mt-3" onClick={() => goto('approvals')}>
-            Review All <ArrowRight className="w-4 h-4" />
-          </PrimaryBtn>
-        </Card>
-      </div>
-      <Card className="p-4 md:p-5">
-        <SectionTitle
-          icon={Users}
-          title="Top Performers This Quarter"
-          right={
-            <button
-              onClick={() => goto('inspectors')}
-              className="text-xs hover:underline"
-              style={{ color: C.core }}
-            >
-              View all →
-            </button>
-          }
-        />
-        <div className="space-y-2">
-          {[
-            {
-              n: 'Mochizuki Ren-san',
-              t: 'Senior Inspector',
-              cases: 21,
-              comp: 89,
+                  // Text-stamp fallback if image embedding isn't available
+                  blank(400, 0),
+                  new (Paragraph as AnyFn)({ alignment: (AlignmentType as AnyObj).CENTER, children: [new (TextRun as AnyFn)({ text: '◆', size: 32, color: '460073', bold: true })] }),
+                  new (Paragraph as AnyFn)({ alignment: (AlignmentType as AnyObj).CENTER, children: [new (TextRun as AnyFn)({ text: 'OFFICIAL SEAL', size: 16, color: '460073', bold: true, characterSpacing: 30 })] }),
+                  new (Paragraph as AnyFn)({ alignment: (AlignmentType as AnyObj).CENTER, children: [new (TextRun as AnyFn)({ text: 'LABOUR STANDARDS', size: 12, color: '460073', bold: true })] }),
+                  new (Paragraph as AnyFn)({ alignment: (AlignmentType as AnyObj).CENTER, children: [new (TextRun as AnyFn)({ text: 'BUREAU OF JAPAN', size: 12, color: '460073', bold: true })] })
+                ],
+            borders: {
+              top: { style: (BorderStyle as AnyObj).NONE },
+              bottom: { style: (BorderStyle as AnyObj).NONE },
+              left: { style: (BorderStyle as AnyObj).NONE },
+              right: { style: (BorderStyle as AnyObj).NONE }
             },
-            { n: 'Asahina Mio-san', t: 'Inspector', cases: 18, comp: 86 },
-            { n: 'Sakuragi Daichi-san', t: 'Inspector', cases: 17, comp: 81 },
-          ].map((p, i) => (
-            <div
-              key={p.n}
-              className="flex items-center gap-4 p-3 border rounded"
-              style={{ borderColor: C.lightest }}
-            >
-              <div
-                style={{
-                  background: i === 0 ? C.core : C.dark,
-                  color: 'white',
-                }}
-                className="w-8 h-8 rounded-full text-sm font-semibold flex items-center justify-center"
-              >
-                {i + 1}
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="text-sm font-semibold text-slate-800">
-                  {p.n}
-                </div>
-                <div className="text-xs text-slate-500">{p.t}</div>
-              </div>
-              <div className="text-right text-xs">
-                <div className="font-semibold text-slate-900">
-                  {p.cases} cases
-                </div>
-                <div className="text-slate-500">{p.comp}% compliance</div>
-              </div>
-            </div>
-          ))}
-        </div>
-      </Card>
-    </div>
-  );
-};
-
-const AdminApprovals = () => {
-  const { t } = useT();
-  const [list, setList] = useState([
-    {
-      id: 'CR-26-0014',
-      co: 'Tachibana Kogyo Co., Ltd.',
-      coJa: '橘工業株式会社',
-      insp: 'Asahina Mio-san',
-      date: 'Apr 23',
-      vio: 'LSA Art. 37 — 3rd repeat (2021, 2023, 2026)',
-      sev: 'High',
-      body: 'Three consecutive inspections found same unpaid overtime premium violation. Total unpaid: ¥4.2M. Recommend criminal prosecution under LSA Art. 120.',
-      evidence: 14,
-    },
-    {
-      id: 'CR-26-0015',
-      co: 'Kurosawa Kensetsu K.K.',
-      coJa: '黒沢建設株式会社',
-      insp: 'Tachibana Yui-san',
-      date: 'Apr 25',
-      vio: 'ISHA Art. 20 — fatal scaffold collapse',
-      sev: 'Critical',
-      body: 'Worker fatality at construction site (Apr 22). Recommend dual prosecution: ISHA + Penal Code Art. 211.',
-      evidence: 31,
-    },
-    {
-      id: 'CR-26-0016',
-      co: 'Hanamura Kikai Co., Ltd.',
-      coJa: '花村機械株式会社',
-      insp: 'Mochizuki Ren-san',
-      date: 'Apr 27',
-      vio: 'LSA Art. 37 repeat (2nd cycle)',
-      sev: 'High',
-      body: 'Same violation as 2023 inspection. ¥1.5M shortfall to 30 workers.',
-      evidence: 18,
-    },
-  ]);
-  const decide = (id, action) =>
-    setList((l) =>
-      l.map((x) => (x.id === id ? { ...x, decision: action } : x))
-    );
-  return (
-    <div className="p-4 md:p-6 space-y-5">
-      <div>
-        <h2 className="text-lg md:text-xl font-semibold text-slate-900">
-          Criminal Referral Approvals
-        </h2>
-        <p className="text-sm text-slate-500">
-          Review and approve cases for prosecutor referral (送検)
-        </p>
-      </div>
-      <div className="space-y-4">
-        {list.map((r) => (
-          <Card key={r.id} className="p-4 md:p-5">
-            <div className="flex items-start justify-between gap-4 flex-wrap">
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <Pill tone="purple">
-                    <Hash className="w-3 h-3" />
-                    {r.id}
-                  </Pill>
-                  <Pill tone={r.sev === 'Critical' ? 'red' : 'amber'}>
-                    {r.sev}
-                  </Pill>
-                  <Pill tone="slate">By {r.insp}</Pill>
-                  <span className="text-xs text-slate-500">· {r.date}</span>
-                </div>
-                <h3 className="text-base font-semibold text-slate-900 mt-2">
-                  {r.co}
-                </h3>
-                <div className="text-xs text-slate-500">{r.coJa}</div>
-                <div
-                  className="text-sm font-medium mt-2"
-                  style={{ color: C.core }}
-                >
-                  {r.vio}
-                </div>
-                <p className="text-xs text-slate-600 mt-2 leading-relaxed">
-                  {r.body}
-                </p>
-                <div className="flex items-center gap-2 mt-3 text-xs flex-wrap">
-                  <Pill tone="slate">{r.evidence} evidence items</Pill>
-                  <button className="hover:underline" style={{ color: C.core }}>
-                    View case file →
-                  </button>
-                </div>
-              </div>
-              <div className="flex flex-col gap-2 w-full md:w-44">
-                {!r.decision ? (
-                  <>
-                    <PrimaryBtn onClick={() => decide(r.id, 'approved')}>
-                      <Stamp className="w-4 h-4" />
-                      {t('approve')} & Refer
-                    </PrimaryBtn>
-                    <RejectBtn
-                      onClick={() => decide(r.id, 'rejected')}
-                      className="px-4 py-2"
-                    >
-                      <X className="w-4 h-4" />
-                      Send back
-                    </RejectBtn>
-                  </>
-                ) : r.decision === 'approved' ? (
-                  <Pill tone="green">
-                    <CheckCircle2 className="w-3 h-3" />
-                    {t('approved')} & forwarded
-                  </Pill>
-                ) : (
-                  <Pill tone="amber">Returned to inspector</Pill>
-                )}
-              </div>
-            </div>
-          </Card>
-        ))}
-      </div>
-    </div>
-  );
-};
-
-const AdminInspectors = () => {
-  const { t } = useT();
-  const [showAdd, setShowAdd] = useState(false);
-  const [newInsp, setNewInsp] = useState({
-    name: '',
-    title: 'Junior Inspector',
-    email: '',
-    spec: 'General',
+            margins: { top: 100, bottom: 100, left: 100, right: 100 }
+          })
+        ]
+      })
+    ],
+    borders: {
+      top: { style: (BorderStyle as AnyObj).NONE }, bottom: { style: (BorderStyle as AnyObj).NONE },
+      left: { style: (BorderStyle as AnyObj).NONE }, right: { style: (BorderStyle as AnyObj).NONE },
+      insideHorizontal: { style: (BorderStyle as AnyObj).NONE }, insideVertical: { style: (BorderStyle as AnyObj).NONE }
+    }
   });
-  const [team, setTeam] = useState([
-    {
-      name: 'Mochizuki Ren-san',
-      title: 'Senior Inspector',
-      badge: 'LSI-11-4827',
-      cases: 21,
-      comp: 89,
-      status: 'active',
-      joined: '2018',
-    },
-    {
-      name: 'Asahina Mio-san',
-      title: 'Inspector',
-      badge: 'LSI-11-5012',
-      cases: 18,
-      comp: 86,
-      status: 'active',
-      joined: '2020',
-    },
-    {
-      name: 'Sakuragi Daichi-san',
-      title: 'Inspector',
-      badge: 'LSI-11-5103',
-      cases: 17,
-      comp: 81,
-      status: 'active',
-      joined: '2021',
-    },
-    {
-      name: 'Hoshino Kenta-san',
-      title: 'Junior Inspector',
-      badge: 'LSI-11-5288',
-      cases: 11,
-      comp: 76,
-      status: 'active',
-      joined: '2024',
-    },
-    {
-      name: 'Tachibana Yui-san',
-      title: 'Specialist (Construction)',
-      badge: 'LSI-11-4956',
-      cases: 14,
-      comp: 84,
-      status: 'active',
-      joined: '2019',
-    },
-    {
-      name: 'Aizawa Riku-san',
-      title: 'Inspector',
-      badge: 'LSI-11-5051',
-      cases: 0,
-      comp: 0,
-      status: 'leave',
-      joined: '2020',
-    },
-  ]);
-  const addInspector = () => {
-    if (!newInsp.name.trim() || !newInsp.email.trim()) return;
-    setTeam((tm) => [
-      ...tm,
-      {
-        name: newInsp.name,
-        title: newInsp.title,
-        badge: 'LSI-11-' + Math.floor(5300 + Math.random() * 200),
-        cases: 0,
-        comp: 0,
-        status: 'active',
-        joined: new Date().getFullYear().toString(),
-      },
-    ]);
-    setNewInsp({
-      name: '',
-      title: 'Junior Inspector',
-      email: '',
-      spec: 'General',
-    });
-    setShowAdd(false);
-  };
+
+  const severityBlock = [
+    blank(240, 0),
+    new (Table as AnyFn)({
+      width: { size: 100, type: (WidthType as AnyObj).PERCENTAGE },
+      rows: [
+        new (TableRow as AnyFn)({
+          children: [
+            new (TableCell as AnyFn)({
+              shading: { fill: accentHex, type: (ShadingType as AnyObj).CLEAR },
+              children: [new (Paragraph as AnyFn)({
+                alignment: (AlignmentType as AnyObj).CENTER,
+                children: [new (TextRun as AnyFn)({ text: `${ds.classification}${ds.severityDisplay}`, color: 'FFFFFF', bold: true, size: 22, characterSpacing: 30 })]
+              })],
+              margins: { top: 150, bottom: 150, left: 200, right: 200 }
+            })
+          ]
+        })
+      ]
+    })
+  ];
+
+  const doc = new (Document as AnyFn)({
+    creator: 'LSB Report Drafter',
+    title: report.documentType,
+    sections: [{
+      properties: { page: { margin: { top: 900, right: 900, bottom: 900, left: 900 } } },
+      children: [...letterhead, metaTable, ...recipientBlock, ...subjectLine, ...narrativeBlock, ...tableBlocks, ...closingBlock, signatureBlock, ...severityBlock]
+    }]
+  });
+
+  const packer = Packer as AnyObj & { toBlob?: AnyFn };
+  if (typeof packer.toBlob !== 'function') throw new Error('docx Packer.toBlob is not a function');
+  const blob = await (packer.toBlob as AnyFn)(doc) as Blob;
+
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `LSB-${report.documentType.replace(/\s+/g, '-')}-${Date.now()}.docx`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+};
+
+// =============================================================================
+// Editable field
+// =============================================================================
+
+interface EditableFieldProps {
+  fieldKey: string;
+  value: string;
+  multiline?: boolean;
+  isEditing: boolean;
+  edits: Record<string, string>;
+  onChange: (k: string, v: string) => void;
+}
+
+const EditableField = ({ fieldKey, value, multiline = false, isEditing, edits, onChange }: EditableFieldProps) => {
+  const current = edits[fieldKey] ?? value;
+  if (!isEditing) return <span>{current}</span>;
+  if (multiline) {
+    return (
+      <textarea value={current} onChange={(e) => onChange(fieldKey, e.target.value)}
+        className="w-full px-2 py-1 text-xs border rounded resize-none focus:outline-none"
+        style={{ borderColor: '#A100FF', color: '#1E293B' }} rows={2} />
+    );
+  }
   return (
-    <div className="p-4 md:p-6 space-y-5">
-      <div className="flex items-start justify-between flex-wrap gap-3">
-        <div>
-          <h2 className="text-lg md:text-xl font-semibold text-slate-900">
-            Inspector Roster
-          </h2>
-          <p className="text-sm text-slate-500">
-            {team.length} total ·{' '}
-            {team.filter((tm) => tm.status === 'active').length} active
-          </p>
-        </div>
-        <div className="flex gap-2 flex-wrap">
-          <div className="relative">
-            <Search className="w-4 h-4 absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
-            <input
-              placeholder={t('search') + '...'}
-              className="pl-8 pr-3 py-2 border rounded text-sm w-44 md:w-56"
-              style={{ borderColor: C.light }}
-            />
+    <input value={current} onChange={(e) => onChange(fieldKey, e.target.value)}
+      className="w-full px-2 py-1 text-xs border rounded focus:outline-none"
+      style={{ borderColor: '#A100FF', color: '#1E293B' }} />
+  );
+};
+
+// =============================================================================
+// MAIN COMPONENT
+// =============================================================================
+
+export default function LSBReportDrafter() {
+  const [language, setLanguage] = useState<Lang>('en');
+  const tr = (k: string, vars?: Record<string, string | number>) => t(k, language, vars);
+
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [input, setInput] = useState('');
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [loaderMessage, setLoaderMessage] = useState({ title: 'Agent reading notes', sub: 'Identifying LSA/ISHA articles, classifying severity…' });
+
+  const [reportEdits, setReportEdits] = useState<Record<string, Record<string, string>>>({});
+  const [verificationAnswers, setVerificationAnswers] = useState<Record<string, Record<number, string>>>({});
+  const [verificationResolved, setVerificationResolved] = useState<Record<string, boolean>>({});
+  const [verificationLoading, setVerificationLoading] = useState<Record<string, boolean>>({});
+  const [reportApproved, setReportApproved] = useState<Record<string, boolean>>({});
+  const [reportDeleted, setReportDeleted] = useState<Record<string, boolean>>({});
+  const [editMode, setEditMode] = useState<Record<string, boolean>>({});
+  const [drillDown, setDrillDown] = useState<{ messageIdx: number; reportIdx: number } | null>(null);
+  const [clarifyAnswers, setClarifyAnswers] = useState<Record<string, { answers: Record<string, string>; otherTexts: Record<string, string>; submitted: boolean }>>({});
+
+  // Timer: tracks elapsed ms for the *current* report generation cycle
+  const generationStart = useRef<number | null>(null);
+
+  // Cumulative timer per chat session — resets on new chat
+  const [sessionElapsed, setSessionElapsed] = useState<number>(0);
+  const [sessionStart, setSessionStart] = useState<number>(Date.now());
+
+  // Generation-time popup — shown briefly after each report set arrives
+  const [genTimePopup, setGenTimePopup] = useState<{ show: boolean; ms: number }>({ show: false, ms: 0 });
+
+  // Post-download toast — shown briefly after DOCX downloads
+  const [downloadToast, setDownloadToast] = useState<{ show: boolean; reportName: string }>({ show: false, reportName: '' });
+
+  // Update session elapsed time every second
+  useEffect(() => {
+    const tick = setInterval(() => setSessionElapsed(Date.now() - sessionStart), 1000);
+    return () => clearInterval(tick);
+  }, [sessionStart]);
+
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!drillDown) messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages, isGenerating, drillDown]);
+
+  const handleNewChat = () => {
+    if (messages.length > 0 && !confirm(tr('confirmNewChat'))) return;
+    setMessages([]);
+    setReportEdits({});
+    setVerificationAnswers({});
+    setVerificationResolved({});
+    setVerificationLoading({});
+    setReportApproved({});
+    setReportDeleted({});
+    setEditMode({});
+    setClarifyAnswers({});
+    setDrillDown(null);
+    setSessionStart(Date.now());
+    setSessionElapsed(0);
+  };
+
+  const callAgent = async (systemPrompt: string, userMessage: string): Promise<string> => {
+    const fullSystemPrompt = systemPrompt + langDirective(language);
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 8192,
+        system: fullSystemPrompt,
+        messages: [{ role: 'user', content: userMessage }]
+      })
+    });
+    if (!response.ok) throw new Error(`API error: ${response.status}`);
+    const data = await response.json();
+    return data.content.map((c: { type: string; text?: string }) => c.type === 'text' ? c.text : '').filter(Boolean).join('\n');
+  };
+
+  const handleSubmit = useCallback(async (textOverride?: string) => {
+    const userText = textOverride ?? input;
+    if (!userText.trim() || isGenerating) return;
+
+    const newUserMessage: Message = { role: 'user', type: 'text', content: userText, timestamp: new Date() };
+    setMessages(prev => [...prev, newUserMessage]);
+    setInput('');
+    setIsGenerating(true);
+    setLoaderMessage({ title: tr('loaderReading'), sub: tr('loaderReadingSub') });
+    generationStart.current = Date.now();
+
+    try {
+      const triageRaw = await callAgent(TRIAGE_PROMPT, userText);
+      let triage: { decision: 'ask' | 'draft'; questions: ClarifyQuestion[] };
+      try {
+        const jsonMatch = triageRaw.match(/\{[\s\S]*\}/);
+        triage = JSON.parse(jsonMatch ? jsonMatch[0] : triageRaw);
+      } catch {
+        triage = { decision: 'draft', questions: [] };
+      }
+
+      if (triage.decision === 'ask' && triage.questions.length > 0) {
+        const questionsWithOther = triage.questions.slice(0, 3).map(q => ({
+          ...q,
+          options: [...q.options.slice(0, 3), 'Other']
+        }));
+        setMessages(prev => [...prev, {
+          role: 'assistant', type: 'clarify', content: '',
+          questions: questionsWithOther, originalNotes: userText, timestamp: new Date()
+        }]);
+        setIsGenerating(false);
+        // Don't reset generationStart — measurement continues across clarifications
+      } else {
+        await draftReports(userText);
+      }
+    } catch (err) {
+      const errorText = err instanceof Error ? err.message : 'Unknown error';
+      setMessages(prev => [...prev, { role: 'assistant', type: 'text', content: `⚠ Failed: ${errorText}`, timestamp: new Date() }]);
+      setIsGenerating(false);
+      generationStart.current = null;
+    }
+  }, [input, isGenerating]);
+
+  const draftReports = async (combinedNotes: string) => {
+    setIsGenerating(true);
+    setLoaderMessage({ title: tr('loaderDrafting'), sub: tr('loaderDraftingSub') });
+    try {
+      const draftRaw = await callAgent(DRAFT_PROMPT, combinedNotes);
+      const reports = splitReports(draftRaw);
+      const isEscalation = reports.length === 1 && reports[0].severity === 'ESCALATION';
+
+      // Compute elapsed
+      const elapsed = generationStart.current ? Date.now() - generationStart.current : 0;
+      generationStart.current = null;
+
+      setMessages(prev => [...prev, {
+        role: 'assistant', type: isEscalation ? 'escalation' : 'reports',
+        content: draftRaw, reports, timestamp: new Date(),
+        generationMs: elapsed
+      }]);
+
+      // Show generation-time popup
+      if (elapsed > 0) {
+        setGenTimePopup({ show: true, ms: elapsed });
+        setTimeout(() => setGenTimePopup(prev => ({ ...prev, show: false })), 5000);
+      }
+    } catch (err) {
+      const errorText = err instanceof Error ? err.message : 'Unknown error';
+      setMessages(prev => [...prev, { role: 'assistant', type: 'text', content: `⚠ Failed: ${errorText}`, timestamp: new Date() }]);
+      generationStart.current = null;
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  const handleClarifySubmit = async (messageIdx: number) => {
+    const msg = messages[messageIdx];
+    if (!msg || !msg.questions || !msg.originalNotes) return;
+    const state = clarifyAnswers[messageIdx];
+    if (!state) return;
+    const enriched = msg.questions.map(q => {
+      const ans = state.answers[q.id];
+      if (!ans) return null;
+      const finalAns = ans === 'Other' ? (state.otherTexts[q.id] || '(no detail provided)') : ans;
+      return `${q.question} → ${finalAns}`;
+    }).filter(Boolean).join('\n');
+    setClarifyAnswers(prev => ({ ...prev, [messageIdx]: { ...state, submitted: true } }));
+    const combined = `${msg.originalNotes}\n\nAdditional clarifications:\n${enriched}`;
+    await draftReports(combined);
+  };
+
+  const setAnswer = (messageIdx: number, qid: string, value: string) => {
+    setClarifyAnswers(prev => ({
+      ...prev,
+      [messageIdx]: {
+        answers: { ...(prev[messageIdx]?.answers || {}), [qid]: value },
+        otherTexts: { ...(prev[messageIdx]?.otherTexts || {}) },
+        submitted: false
+      }
+    }));
+  };
+
+  const setOtherText = (messageIdx: number, qid: string, value: string) => {
+    setClarifyAnswers(prev => ({
+      ...prev,
+      [messageIdx]: {
+        answers: { ...(prev[messageIdx]?.answers || {}) },
+        otherTexts: { ...(prev[messageIdx]?.otherTexts || {}), [qid]: value },
+        submitted: false
+      }
+    }));
+  };
+
+  const updateVerification = (reportKey: string, idx: number, value: string) => {
+    setVerificationAnswers(prev => ({ ...prev, [reportKey]: { ...(prev[reportKey] || {}), [idx]: value } }));
+  };
+
+  const handleVerificationSubmit = async (reportKey: string, messageIdx: number, reportIdx: number) => {
+    const msg = messages[messageIdx];
+    const report = msg?.reports?.[reportIdx];
+    if (!report) return;
+    setVerificationLoading(prev => ({ ...prev, [reportKey]: true }));
+    try {
+      const answers = verificationAnswers[reportKey] || {};
+      const enriched = report.verificationItems.map((item, i) => `${item} → ${answers[i] || '(no answer)'}`).join('\n');
+      const redraftInput = `PROVISIONAL DRAFT:\n${report.rawText}\n\nINSPECTOR'S CONFIRMED ANSWERS:\n${enriched}`;
+      const redraftedRaw = await callAgent(REDRAFT_PROMPT, redraftInput);
+      const redraftedReports = splitReports(redraftedRaw);
+      const updated = redraftedReports[0] || report;
+      setMessages(prev => prev.map((m, mi) => {
+        if (mi !== messageIdx || !m.reports) return m;
+        const newReports = [...m.reports];
+        newReports[reportIdx] = { ...updated, verificationItems: [] };
+        return { ...m, reports: newReports };
+      }));
+      setVerificationResolved(prev => ({ ...prev, [reportKey]: true }));
+    } catch (err) {
+      console.error('Re-draft failed:', err);
+      setMessages(prev => prev.map((m, mi) => {
+        if (mi !== messageIdx || !m.reports) return m;
+        const newReports = [...m.reports];
+        newReports[reportIdx] = { ...newReports[reportIdx], verificationItems: [] };
+        return { ...m, reports: newReports };
+      }));
+      setVerificationResolved(prev => ({ ...prev, [reportKey]: true }));
+    } finally {
+      setVerificationLoading(prev => ({ ...prev, [reportKey]: false }));
+    }
+  };
+
+  const updateEdit = (reportKey: string, fieldKey: string, value: string) => {
+    setReportEdits(prev => ({ ...prev, [reportKey]: { ...(prev[reportKey] || {}), [fieldKey]: value } }));
+  };
+
+  const handleApprove = async (reportKey: string, report: ParsedReport) => {
+    try {
+      await generateDOCX(report, reportEdits[reportKey] || {}, language);
+      setReportApproved(prev => ({ ...prev, [reportKey]: true }));
+      setDownloadToast({ show: true, reportName: report.documentType });
+      setTimeout(() => setDownloadToast({ show: false, reportName: '' }), 4500);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Unknown error';
+      alert(`DOCX download failed: ${msg}`);
+    }
+  };
+
+  const handleDelete = (reportKey: string) => {
+    if (confirm(tr('deleteConfirm'))) {
+      setReportDeleted(prev => ({ ...prev, [reportKey]: true }));
+      setDrillDown(null);
+    }
+  };
+
+  // ===========================================================================
+  // DRILL-IN VIEW
+  // ===========================================================================
+
+  if (drillDown) {
+    const msg = messages[drillDown.messageIdx];
+    const report = msg?.reports?.[drillDown.reportIdx];
+    if (!report) { setDrillDown(null); return null; }
+    const reportKey = `${drillDown.messageIdx}-${drillDown.reportIdx}`;
+    const approved = reportApproved[reportKey];
+    const isEditing = !!editMode[reportKey];
+    const theme = severityTheme(report.severity);
+    const edits = reportEdits[reportKey] || {};
+    const onFieldChange = (k: string, v: string) => updateEdit(reportKey, k, v);
+    const vAnsState = verificationAnswers[reportKey] || {};
+    const needsVerification = report.verificationItems.length > 0 && !verificationResolved[reportKey];
+    const vLoading = !!verificationLoading[reportKey];
+    const allVAnswered = report.verificationItems.every((_, i) => (vAnsState[i] || '').trim().length > 0);
+
+    return (
+      <div className="flex flex-col h-screen font-sans" style={{ background: 'linear-gradient(135deg, #FAFAFB 0%, #F5F0FA 100%)' }}>
+        <header className="border-b bg-white/95 backdrop-blur-sm sticky top-0 z-10" style={{ borderColor: 'rgba(161,0,255,0.1)' }}>
+          <div className="max-w-5xl mx-auto px-3 sm:px-6 py-3">
+            <div className="flex items-center gap-2 sm:gap-3 mb-3 sm:mb-0">
+              <button onClick={() => setDrillDown(null)} className="inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium" style={{ color: '#460073', background: 'rgba(161,0,255,0.06)' }}>
+                <ArrowLeft className="w-4 h-4" /> <span className="hidden sm:inline">{tr('backToDrafts')}</span><span className="sm:hidden">{tr('backShort')}</span>
+              </button>
+              <div className="min-w-0 flex-1">
+                <div className="text-[10px] font-bold uppercase tracking-wider" style={{ color: '#A100FF' }}>{sevDisplay(report.severity, language)}</div>
+                <div className="text-sm font-bold text-slate-900 truncate">{docTypeDisplay(report.documentType, language)}</div>
+              </div>
+            </div>
+            <div className="flex flex-wrap items-center gap-2 sm:hidden">
+              <button onClick={() => setEditMode(prev => ({ ...prev, [reportKey]: !prev[reportKey] }))} disabled={approved || needsVerification} className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-semibold transition-all disabled:opacity-50" style={{ background: isEditing ? '#460073' : 'rgba(161,0,255,0.06)', color: isEditing ? '#fff' : '#460073', border: '1px solid rgba(161,0,255,0.2)' }}>
+                {isEditing ? <><Save className="w-3 h-3" /> {tr('doneShort')}</> : <><Edit3 className="w-3 h-3" /> {tr('editShort')}</>}
+              </button>
+              <button onClick={() => handleDelete(reportKey)} className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-semibold text-rose-700" style={{ background: '#FEF2F2', border: '1px solid #FECACA' }}>
+                <Trash2 className="w-3 h-3" /> {tr('deleteAction')}
+              </button>
+              <button onClick={() => handleApprove(reportKey, report)} disabled={approved || isEditing || needsVerification} className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-[11px] font-bold text-white transition-all disabled:opacity-60 disabled:cursor-not-allowed flex-1 justify-center" style={{ background: approved ? '#10B981' : 'linear-gradient(135deg, #A100FF 0%, #460073 100%)' }}>
+                {approved ? <><CheckCircle className="w-3 h-3" /> {tr('sentShort')}</> : <><Download className="w-3 h-3" /> {tr('downloadShort')}</>}
+              </button>
+            </div>
+            <div className="hidden sm:flex items-center gap-2 absolute top-3 right-6">
+              <button onClick={() => setEditMode(prev => ({ ...prev, [reportKey]: !prev[reportKey] }))} disabled={approved || needsVerification} className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold transition-all disabled:opacity-50" style={{ background: isEditing ? '#460073' : 'rgba(161,0,255,0.06)', color: isEditing ? '#fff' : '#460073', border: '1px solid rgba(161,0,255,0.2)' }}>
+                {isEditing ? <><Save className="w-3.5 h-3.5" /> {tr('doneEditing')}</> : <><Edit3 className="w-3.5 h-3.5" /> {tr('editFields')}</>}
+              </button>
+              <button onClick={() => handleDelete(reportKey)} className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold text-rose-700" style={{ background: '#FEF2F2', border: '1px solid #FECACA' }}>
+                <Trash2 className="w-3.5 h-3.5" /> {tr('deleteAction')}
+              </button>
+              <button onClick={() => handleApprove(reportKey, report)} disabled={approved || isEditing || needsVerification} className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold text-white transition-all disabled:opacity-60 disabled:cursor-not-allowed" style={{ background: approved ? '#10B981' : 'linear-gradient(135deg, #A100FF 0%, #460073 100%)', boxShadow: approved ? 'none' : '0 4px 12px rgba(161,0,255,0.25)' }}>
+                {approved ? <><CheckCircle className="w-3.5 h-3.5" /> {tr('approved')}</> : <><Download className="w-3.5 h-3.5" /> {tr('approveDownload')}</>}
+              </button>
+            </div>
           </div>
-          <PrimaryBtn onClick={() => setShowAdd(true)}>
-            <UserPlus className="w-4 h-4" />
-            Add Inspector
-          </PrimaryBtn>
-        </div>
-      </div>
-      {showAdd && (
-        <Card
-          className="p-4 md:p-5"
-          style={{ borderColor: C.core, borderWidth: 2 }}
-        >
-          <SectionTitle title="Add New Inspector" />
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="text-xs font-medium text-slate-600 uppercase">
-                Full name
-              </label>
-              <input
-                value={newInsp.name}
-                onChange={(e) =>
-                  setNewInsp((p) => ({ ...p, name: e.target.value }))
-                }
-                className="mt-1 w-full px-3 py-2 border rounded text-sm"
-                style={{ borderColor: C.light }}
-                placeholder="e.g. Yamamoto Akira"
-              />
-            </div>
-            <div>
-              <label className="text-xs font-medium text-slate-600 uppercase">
-                Title
-              </label>
-              <select
-                value={newInsp.title}
-                onChange={(e) =>
-                  setNewInsp((p) => ({ ...p, title: e.target.value }))
-                }
-                className="mt-1 w-full px-3 py-2 border rounded text-sm"
-                style={{ borderColor: C.light }}
-              >
-                <option>Junior Inspector</option>
-                <option>Inspector</option>
-                <option>Senior Inspector</option>
-                <option>Specialist</option>
-              </select>
-            </div>
-            <div>
-              <label className="text-xs font-medium text-slate-600 uppercase">
-                Email
-              </label>
-              <input
-                type="email"
-                value={newInsp.email}
-                onChange={(e) =>
-                  setNewInsp((p) => ({ ...p, email: e.target.value }))
-                }
-                className="mt-1 w-full px-3 py-2 border rounded text-sm"
-                style={{ borderColor: C.light }}
-                placeholder="@mhlw.go.jp"
-              />
-            </div>
-            <div>
-              <label className="text-xs font-medium text-slate-600 uppercase">
-                Specialization
-              </label>
-              <select
-                value={newInsp.spec}
-                onChange={(e) =>
-                  setNewInsp((p) => ({ ...p, spec: e.target.value }))
-                }
-                className="mt-1 w-full px-3 py-2 border rounded text-sm"
-                style={{ borderColor: C.light }}
-              >
-                <option>General</option>
-                <option>Construction</option>
-                <option>Manufacturing</option>
-                <option>Foreign Workers</option>
-              </select>
-            </div>
-            <div
-              className="md:col-span-2 flex justify-end gap-2 pt-2 border-t"
-              style={{ borderColor: C.lightest }}
-            >
-              <RejectBtn
-                onClick={() => setShowAdd(false)}
-                className="px-4 py-2"
-              >
-                {t('cancel')}
-              </RejectBtn>
-              <PrimaryBtn
-                onClick={addInspector}
-                disabled={!newInsp.name.trim() || !newInsp.email.trim()}
-              >
-                <Check className="w-4 h-4" />
-                Create Account
-              </PrimaryBtn>
-            </div>
-          </div>
-        </Card>
-      )}
-      <Card className="overflow-x-auto">
-        <table className="w-full text-sm min-w-[640px]">
-          <thead
-            style={{ background: C.lightest + '60' }}
-            className="text-xs uppercase tracking-wider text-slate-600"
-          >
-            <tr>
-              <th className="px-4 py-3 text-left">Inspector</th>
-              <th className="px-4 py-3 text-left">Badge</th>
-              <th className="px-4 py-3 text-left">Title</th>
-              <th className="px-4 py-3 text-left">{t('ytdCases')}</th>
-              <th className="px-4 py-3 text-left">Compliance</th>
-              <th className="px-4 py-3 text-left">{t('status')}</th>
-              <th className="px-4 py-3"></th>
-            </tr>
-          </thead>
-          <tbody>
-            {team.map((tm) => (
-              <tr
-                key={tm.badge}
-                className="border-t border-slate-100 hover:bg-purple-50/50"
-              >
-                <td className="px-4 py-3">
-                  <div className="flex items-center gap-2">
-                    <div
-                      style={{ background: C.core, color: 'white' }}
-                      className="w-8 h-8 rounded-full text-xs font-semibold flex items-center justify-center"
-                    >
-                      {tm.name[0]}
-                    </div>
-                    <div>
-                      <div className="font-medium text-slate-800">
-                        {tm.name}
+        </header>
+
+        <main className="flex-1 overflow-y-auto">
+          <div className="max-w-5xl mx-auto px-3 sm:px-6 py-4 sm:py-6">
+            {needsVerification && (
+              <div className="mb-4 sm:mb-6 rounded-2xl border-2 overflow-hidden" style={{ borderColor: '#A100FF', boxShadow: '0 8px 30px rgba(161,0,255,0.15)' }}>
+                <div className="px-4 sm:px-5 py-3 flex items-center gap-2" style={{ background: 'linear-gradient(135deg, #A100FF 0%, #460073 100%)' }}>
+                  <HelpCircle className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
+                  <div className="text-xs sm:text-sm font-bold text-white uppercase tracking-wider">{tr('verificationHeading')}</div>
+                </div>
+                <div className="p-4 sm:p-5 bg-white">
+                  <div className="text-[11px] sm:text-xs text-slate-600 mb-4">{tr('verificationDescription')}</div>
+                  <div className="space-y-3 sm:space-y-4">
+                    {report.verificationItems.map((item, vi) => (
+                      <div key={vi}>
+                        <div className="text-xs sm:text-sm text-slate-800 font-medium mb-1.5">
+                          <span className="inline-block w-5 h-5 rounded-full text-white text-[10px] font-bold leading-5 text-center mr-2" style={{ background: '#A100FF' }}>{vi + 1}</span>
+                          {item}
+                        </div>
+                        <input value={vAnsState[vi] || ''} onChange={(e) => updateVerification(reportKey, vi, e.target.value)} placeholder={tr('verificationPlaceholder')} disabled={vLoading} className="w-full px-3 py-2 text-xs sm:text-sm rounded-lg border focus:outline-none focus:ring-2 disabled:bg-slate-50" style={{ borderColor: 'rgba(161,0,255,0.3)', color: '#1E293B' }} />
                       </div>
-                      <div className="text-[10px] text-slate-500">
-                        Since {tm.joined}
-                      </div>
+                    ))}
+                  </div>
+                  <div className="mt-4 flex justify-end">
+                    <button onClick={() => handleVerificationSubmit(reportKey, drillDown.messageIdx, drillDown.reportIdx)} disabled={!allVAnswered || vLoading} className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-xs sm:text-sm font-bold text-white transition-all disabled:opacity-50 disabled:cursor-not-allowed" style={{ background: 'linear-gradient(135deg, #A100FF 0%, #460073 100%)', boxShadow: '0 4px 12px rgba(161,0,255,0.3)' }}>
+                      {vLoading ? (<><Loader2 className="w-4 h-4 animate-spin" /> {tr('verificationFinalising')}</>) : (<><Sparkles className="w-4 h-4" /> {tr('verificationApply')}</>)}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden" style={{ boxShadow: '0 4px 20px rgba(70,0,115,0.06)', opacity: needsVerification || vLoading ? 0.55 : 1, pointerEvents: needsVerification || vLoading ? 'none' : 'auto', transition: 'opacity 0.3s' }}>
+              <div className="px-4 sm:px-6 py-4 sm:py-5" style={{ background: 'linear-gradient(135deg, #460073 0%, #A100FF 100%)' }}>
+                <div className="text-base sm:text-xl font-bold text-white text-center tracking-wide">{docTypeDisplay(report.documentType, language)}</div>
+              </div>
+
+              <div className="p-4 sm:p-8 space-y-4 sm:space-y-6">
+                <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1 pb-3 border-b border-slate-100 text-xs sm:text-sm">
+                  <div>
+                    <span className="text-slate-500 mr-1.5">{tr('dateLabel')}</span>
+                    <EditableField fieldKey="date" value={report.date} isEditing={isEditing} edits={edits} onChange={onFieldChange} />
+                  </div>
+                  <div className="text-slate-500">{tr('docNumLabel')} <span className="font-mono text-slate-700">{report.documentNumber}</span></div>
+                </div>
+
+                <div className="rounded-lg p-4 sm:p-5" style={{ background: '#FAF7FE', border: '1px solid rgba(161,0,255,0.1)' }}>
+                  <div className="text-[10px] font-bold uppercase tracking-wider mb-2 sm:mb-3" style={{ color: '#A100FF' }}>{tr('toLabel')}</div>
+                  <div className="text-sm sm:text-base font-bold text-slate-900 mb-1.5 sm:mb-2">
+                    <EditableField fieldKey="businessName" value={report.businessName} isEditing={isEditing} edits={edits} onChange={onFieldChange} />
+                  </div>
+                  <div className="text-xs sm:text-sm text-slate-600 mb-1 sm:mb-1.5">
+                    <EditableField fieldKey="businessAddress" value={report.businessAddress} isEditing={isEditing} edits={edits} onChange={onFieldChange} />
+                  </div>
+                  <div className="text-xs sm:text-sm text-slate-600">
+                    <span className="text-slate-400 mr-1">{tr('attnLabel')}</span>
+                    <EditableField fieldKey="representative" value={report.representative} isEditing={isEditing} edits={edits} onChange={onFieldChange} />
+                  </div>
+                </div>
+
+                <div className="text-xs sm:text-sm text-slate-700 leading-relaxed italic px-1 sm:px-2">{report.narrative}</div>
+
+                {report.sections.map((section, si) => (
+                  <div key={si}>
+                    <div className="text-[10px] sm:text-xs font-bold uppercase tracking-wider mb-2" style={{ color: '#460073' }}>{section.title}</div>
+                    <div className="rounded-lg overflow-x-auto border border-slate-200">
+                      <table className="w-full text-xs sm:text-sm" style={{ minWidth: '500px' }}>
+                        <thead>
+                          <tr style={{ background: theme.tableHeader }}>
+                            {section.headers.map((h, hi) => (
+                              <th key={hi} className="text-left px-2 sm:px-3 py-2 sm:py-2.5 font-semibold text-[10px] sm:text-xs whitespace-nowrap" style={{ color: theme.text }}>{h}</th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {section.rows.map((row, rIdx) => (
+                            <tr key={rIdx} className="border-t border-slate-100" style={{ background: rIdx % 2 === 0 ? 'white' : '#FAF7FE' }}>
+                              {row.map((cell, cIdx) => (
+                                <td key={cIdx} className="px-2 sm:px-3 py-2 sm:py-3 align-top text-slate-700 text-[11px] sm:text-xs">
+                                  <EditableField fieldKey={`${section.title}-${rIdx}-${cIdx}`} value={cell} multiline={cell.length > 60} isEditing={isEditing} edits={edits} onChange={onFieldChange} />
+                                </td>
+                              ))}
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
                     </div>
                   </div>
-                </td>
-                <td className="px-4 py-3 font-mono text-xs">{tm.badge}</td>
-                <td className="px-4 py-3 text-slate-700">{tm.title}</td>
-                <td className="px-4 py-3 font-medium">{tm.cases}</td>
-                <td className="px-4 py-3">
-                  {tm.comp ? (
-                    <div className="flex items-center gap-2">
-                      <div className="w-20 h-1.5 rounded-full bg-slate-200 overflow-hidden">
-                        <div
-                          className="h-full"
-                          style={{ width: `${tm.comp}%`, background: C.core }}
-                        />
-                      </div>
-                      <span className="text-xs">{tm.comp}%</span>
+                ))}
+
+                <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4 pt-4 sm:pt-6 border-t border-slate-100">
+                  <div className="order-2 sm:order-1">
+                    <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-2">{tr('issuedByLabel')}</div>
+                    <div className="text-sm font-semibold text-slate-900">{report.inspectorName}</div>
+                    <div className="text-xs text-slate-500 mt-0.5">{tr('badgeLabel')} {report.inspectorBadge}</div>
+                    <div className="text-xs text-slate-500">
+                      <EditableField fieldKey="issuingOffice" value={report.issuingOffice} isEditing={isEditing} edits={edits} onChange={onFieldChange} />
                     </div>
-                  ) : (
-                    <span className="text-xs text-slate-400">—</span>
-                  )}
-                </td>
-                <td className="px-4 py-3">
-                  {tm.status === 'active' ? (
-                    <Pill tone="green">{t('active')}</Pill>
-                  ) : (
-                    <Pill tone="amber">{t('onLeave')}</Pill>
-                  )}
-                </td>
-                <td className="px-4 py-3 text-right">
-                  <button
-                    className="text-xs hover:underline"
-                    style={{ color: C.core }}
-                  >
-                    Manage
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </Card>
-    </div>
-  );
-};
+                    <div className="mt-3 sm:mt-4 pt-1 border-t border-slate-300 w-48 sm:w-56">
+                      <div className="text-[9px] text-slate-400 uppercase tracking-wider">{tr('inspectorSignature')}</div>
+                    </div>
+                  </div>
+                  <div className="order-1 sm:order-2 self-center sm:self-end">
+                    <LSIOSeal size={80} />
+                  </div>
+                </div>
 
-const AdminAnalytics = () => {
-  const { t } = useT();
-  const trend = [
-    { m: 'Nov', insp: 102, viol: 187, comp: 76 },
-    { m: 'Dec', insp: 95, viol: 168, comp: 78 },
-    { m: 'Jan', insp: 88, viol: 152, comp: 79 },
-    { m: 'Feb', insp: 110, viol: 198, comp: 80 },
-    { m: 'Mar', insp: 108, viol: 172, comp: 81 },
-    { m: 'Apr', insp: 127, viol: 215, comp: 81 },
-  ];
-  const industries = [
-    { name: 'Manufacturing', value: 38 },
-    { name: 'Construction', value: 28 },
-    { name: 'Logistics', value: 14 },
-    { name: 'Food', value: 12 },
-    { name: 'Other', value: 8 },
-  ];
-  const enforcement = [
-    { type: 'Guidance', count: 142 },
-    { type: 'Recommendation', count: 89 },
-    { type: 'Order', count: 24 },
-    { type: 'Criminal Ref', count: 7 },
-  ];
-  return (
-    <div className="p-4 md:p-6 space-y-5">
-      <div className="flex items-start justify-between flex-wrap gap-2">
-        <div>
-          <h2 className="text-lg md:text-xl font-semibold text-slate-900">
-            Regional Analytics
-          </h2>
-          <p className="text-sm text-slate-500">{ADMIN.officeJa} · YTD 2026</p>
-        </div>
-        <SecondaryBtn>{t('exportRep')} to MHLW</SecondaryBtn>
-      </div>
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
-        {[
-          { l: 'Inspections (YTD)', v: '630', d: '+22%' },
-          { l: 'Violations Found', v: '1,092', d: '+18%' },
-          { l: 'Compliance Rate', v: '81%', d: '+5pp' },
-          { l: 'Avg. Case Time', v: '2.1 hr', d: '−71%' },
-        ].map((k) => (
-          <Card key={k.l} className="p-3 md:p-4">
-            <div className="text-[10px] md:text-xs text-slate-500 uppercase tracking-wider">
-              {k.l}
-            </div>
-            <div className="flex items-baseline gap-2 mt-2 flex-wrap">
-              <div
-                className="text-xl md:text-2xl font-semibold"
-                style={{ color: C.core }}
-              >
-                {k.v}
-              </div>
-              <div className="text-xs font-semibold text-emerald-600 flex items-center gap-0.5">
-                <ArrowUp className="w-3 h-3" />
-                {k.d}
+                {report.severity && (
+                  <div className="rounded-lg py-2.5 sm:py-3 px-4 text-center font-bold text-white text-xs sm:text-sm tracking-widest" style={{ background: theme.accent }}>
+                    {tr('severityLabel')} {sevDisplay(report.severity, language)}
+                  </div>
+                )}
               </div>
             </div>
-          </Card>
-        ))}
-      </div>
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-        <Card className="p-4 md:p-5 lg:col-span-2">
-          <SectionTitle title="Inspections, Violations & Compliance" />
-          <ResponsiveContainer width="100%" height={280}>
-            <LineChart data={trend}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-              <XAxis dataKey="m" tick={{ fontSize: 11 }} stroke="#94a3b8" />
-              <YAxis yAxisId="left" tick={{ fontSize: 11 }} stroke="#94a3b8" />
-              <YAxis
-                yAxisId="right"
-                orientation="right"
-                tick={{ fontSize: 11 }}
-                stroke="#94a3b8"
-                domain={[60, 100]}
-              />
-              <Tooltip />
-              <Legend wrapperStyle={{ fontSize: 11 }} />
-              <Line
-                yAxisId="left"
-                type="monotone"
-                dataKey="insp"
-                stroke={C.core}
-                strokeWidth={2.5}
-                name="Inspections"
-                dot={{ fill: C.core, r: 4 }}
-              />
-              <Line
-                yAxisId="left"
-                type="monotone"
-                dataKey="viol"
-                stroke={C.dark}
-                strokeWidth={2.5}
-                name="Violations"
-                dot={{ fill: C.dark, r: 4 }}
-              />
-              <Line
-                yAxisId="right"
-                type="monotone"
-                dataKey="comp"
-                stroke="#059669"
-                strokeWidth={2.5}
-                name="Compliance %"
-                strokeDasharray="4 2"
-                dot={{ fill: '#059669', r: 4 }}
-              />
-            </LineChart>
-          </ResponsiveContainer>
-        </Card>
-        <Card className="p-4 md:p-5">
-          <SectionTitle title="By Industry" />
-          <ResponsiveContainer width="100%" height={280}>
-            <PieChart>
-              <Pie
-                data={industries}
-                dataKey="value"
-                nameKey="name"
-                innerRadius={45}
-                outerRadius={85}
-                paddingAngle={2}
-              >
-                {industries.map((_, i) => (
-                  <Cell
-                    key={i}
-                    fill={[C.darkest, C.dark, C.core, C.light, C.lightest][i]}
-                  />
-                ))}
-              </Pie>
-              <Tooltip />
-              <Legend wrapperStyle={{ fontSize: 10 }} />
-            </PieChart>
-          </ResponsiveContainer>
-        </Card>
-        <Card className="p-4 md:p-5 lg:col-span-2">
-          <SectionTitle title="Enforcement Action Mix" />
-          <ResponsiveContainer width="100%" height={220}>
-            <BarChart data={enforcement} layout="vertical">
-              <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-              <XAxis type="number" tick={{ fontSize: 11 }} stroke="#94a3b8" />
-              <YAxis
-                dataKey="type"
-                type="category"
-                tick={{ fontSize: 11 }}
-                stroke="#94a3b8"
-                width={120}
-              />
-              <Tooltip />
-              <Bar dataKey="count" radius={[0, 6, 6, 0]}>
-                {enforcement.map((_, i) => (
-                  <Cell
-                    key={i}
-                    fill={
-                      [C.lightest, C.light, C.core, C.darkest][i] || C.darkest
-                    }
-                  />
-                ))}
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
-        </Card>
-        <Card className="p-4 md:p-5">
-          <SectionTitle title="ILO Ratio Bridge" />
-          <div className="text-xs text-slate-500 mb-3">
-            Closing the inspector ratio gap
           </div>
-          <ResponsiveContainer width="100%" height={220}>
-            <RadarChart
-              data={[
-                { x: 'Site time', manual: 60, ai: 90 },
-                { x: 'Reports', manual: 25, ai: 95 },
-                { x: 'Detection', manual: 70, ai: 94 },
-                { x: 'Follow-up', manual: 55, ai: 92 },
-                { x: 'Throughput', manual: 50, ai: 88 },
-              ]}
-            >
-              <PolarGrid stroke="#e2e8f0" />
-              <PolarAngleAxis
-                dataKey="x"
-                tick={{ fontSize: 10, fill: '#475569' }}
-              />
-              <PolarRadiusAxis
-                angle={90}
-                domain={[0, 100]}
-                tick={{ fontSize: 9 }}
-              />
-              <Radar
-                name="Manual"
-                dataKey="manual"
-                stroke="#94a3b8"
-                fill="#94a3b8"
-                fillOpacity={0.2}
-              />
-              <Radar
-                name="AI-assisted"
-                dataKey="ai"
-                stroke={C.core}
-                fill={C.core}
-                fillOpacity={0.4}
-              />
-              <Legend wrapperStyle={{ fontSize: 10 }} />
-            </RadarChart>
-          </ResponsiveContainer>
-        </Card>
-      </div>
-      <Card
-        className="p-4 md:p-5"
-        style={{
-          background: `linear-gradient(135deg, ${C.lightest}80 0%, white 100%)`,
-        }}
-      >
-        <div className="flex items-start gap-4">
-          <Trophy className="w-6 h-6 flex-shrink-0" style={{ color: C.core }} />
-          <div>
-            <div className="text-sm font-semibold text-slate-900">
-              Productivity Impact Summary
+        </main>
+
+        {/* Download success toast */}
+        {downloadToast.show && (
+          <div className="fixed bottom-4 left-4 right-4 sm:left-auto sm:right-6 sm:max-w-sm bg-white border rounded-xl p-3 sm:p-4 animate-bounce-in" style={{ borderColor: 'rgba(161,0,255,0.25)', boxShadow: '0 10px 40px rgba(70,0,115,0.15)' }}>
+            <div className="flex items-start gap-3">
+              <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: 'linear-gradient(135deg, #A100FF 0%, #460073 100%)' }}>
+                <CheckCircle className="w-4 h-4 text-white" />
+              </div>
+              <div className="min-w-0">
+                <div className="text-xs sm:text-sm font-semibold text-slate-900">{tr('downloadedTitle')}</div>
+                <div className="text-[11px] sm:text-xs text-slate-600 mt-0.5 truncate">{tr('downloadedSub', { name: downloadToast.reportName })}</div>
+              </div>
             </div>
-            <p className="text-sm text-slate-700 mt-1 leading-relaxed">
-              Office throughput up{' '}
-              <strong style={{ color: C.core }}>+22%</strong> YTD with same
-              headcount. Average case time reduced from <strong>7.2 hr</strong>{' '}
-              to <strong>2.1 hr</strong>.
-            </p>
           </div>
-        </div>
-      </Card>
-    </div>
-  );
-};
-
-export default function App() {
-  const [user, setUser] = useState(null);
-  const [phase, setPhase] = useState('home');
-  const [online, setOnline] = useState(true);
-  const [completed, setCompleted] = useState([]);
-  const [lang, setLang] = useState('en');
-  const [mobileOpen, setMobileOpen] = useState(false);
-  const [alerts, setAlerts] = useState([]);
-  const [violations, setViolations] = useState([]);
-  const [captures, setCaptures] = useState([]);
-  const [danger, setDanger] = useState(false);
-  const [dangerStatus, setDangerStatus] = useState(null);
-  const [elapsed, setElapsed] = useState('00:00');
-  const [paused, setPaused] = useState(false);
-  const [stopped, setStopped] = useState(false);
-  const [docStatuses, setDocStatuses] = useState({});
-  const [docTexts, setDocTexts] = useState({});
-  const [delivered, setDelivered] = useState(false);
-
-  const startTime = useRef(null);
-  const accumRef = useRef(0);
-  const lastTickRef = useRef(null);
-  useEffect(() => {
-    if (phase === 'live' && !startTime.current) startTime.current = Date.now();
-    if (phase !== 'live') return;
-    const tick = setInterval(() => {
-      if (paused || stopped) {
-        lastTickRef.current = Date.now();
-        return;
-      }
-      if (!lastTickRef.current) lastTickRef.current = Date.now();
-      const now = Date.now();
-      accumRef.current += now - lastTickRef.current;
-      lastTickRef.current = now;
-      const sec = Math.floor(accumRef.current / 1000);
-      setElapsed(
-        `${String(Math.floor(sec / 60)).padStart(2, '0')}:${String(
-          sec % 60
-        ).padStart(2, '0')}`
-      );
-    }, 250);
-    return () => clearInterval(tick);
-  }, [phase, paused, stopped]);
-
-  const goto = (next) => {
-    if (phase !== next) setCompleted((c) => [...new Set([...c, phase])]);
-    setPhase(next);
-  };
-  const handleLogin = (role) => {
-    setUser(role);
-    setPhase(role === 'admin' ? 'admin-home' : 'home');
-    setCompleted([]);
-  };
-  const handleLogout = () => {
-    setUser(null);
-    setPhase('home');
-    setCompleted([]);
-    setAlerts([]);
-    setViolations([]);
-    setCaptures([]);
-    setDanger(false);
-    setDangerStatus(null);
-    setDocStatuses({});
-    setDocTexts({});
-    setDelivered(false);
-    startTime.current = null;
-    setPaused(false);
-    setStopped(false);
-    accumRef.current = 0;
-    lastTickRef.current = null;
-  };
-
-  const t = tFor(lang);
-  const ctxValue = { lang, setLang, t };
-
-  if (!user) {
-    return (
-      <LangCtx.Provider value={ctxValue}>
-        <LoginScreen onLogin={handleLogin} lang={lang} setLang={setLang} />
-      </LangCtx.Provider>
+        )}
+      </div>
     );
   }
 
-  const currentUser = user === 'admin' ? ADMIN : INSP;
+  // ===========================================================================
+  // MAIN CHAT VIEW
+  // ===========================================================================
 
   return (
-    <LangCtx.Provider value={ctxValue}>
-      <div
-        className="h-screen flex bg-slate-50 text-slate-900"
-        style={{ fontFamily: FONT }}
-      >
-        <Sidebar
-          phase={phase}
-          setPhase={setPhase}
-          completed={completed}
-          role={user}
-          mobileOpen={mobileOpen}
-          setMobileOpen={setMobileOpen}
-        />
-        <div className="flex-1 flex flex-col min-w-0">
-          <TopBar
-            phase={phase}
-            online={online}
-            setOnline={setOnline}
-            user={currentUser}
-            role={user}
-            goto={goto}
-            onLogout={handleLogout}
-            setMobileOpen={setMobileOpen}
-          />
-          <div
-            style={{ background: C.lightest + '60', borderColor: C.light }}
-            className="border-b px-3 md:px-6 py-1.5 text-[11px] flex items-center justify-between flex-shrink-0 gap-2"
-          >
-            <div
-              className="flex items-center gap-2 min-w-0"
-              style={{ color: C.core }}
-            >
-              <Sparkles className="w-3 h-3 flex-shrink-0" />
-              <span className="truncate">
-                <strong>{t('protoDemo')}</strong> —{' '}
-                {user === 'inspector' && phase === 'live'
-                  ? 'Tap capture buttons to simulate.'
-                  : `Signed in as ${
-                      user === 'admin' ? t('administrator') : t('inspector')
-                    }.`}
-              </span>
+    <div className="flex flex-col h-screen font-sans" style={{ background: 'linear-gradient(135deg, #FAFAFB 0%, #F5F0FA 100%)' }}>
+      <header className="border-b bg-white/90 backdrop-blur-sm" style={{ borderColor: 'rgba(161,0,255,0.1)' }}>
+        <div className="max-w-6xl mx-auto px-3 sm:px-6 py-3 sm:py-4 flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+            <div className="w-9 h-9 sm:w-11 sm:h-11 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: 'linear-gradient(135deg, #A100FF 0%, #460073 100%)', boxShadow: '0 4px 14px rgba(161,0,255,0.35)' }}>
+              <LSBLogo className="w-5 h-5 sm:w-6 sm:h-6" />
+            </div>
+            <div className="min-w-0">
+              <h1 className="text-sm sm:text-base font-bold text-slate-900 tracking-tight truncate">{tr('appTitle')}</h1>
+              <p className="text-[10px] sm:text-xs text-slate-500 mt-0.5 truncate hidden sm:block">{tr('appSubtitle')}</p>
             </div>
           </div>
-          <main
-            className={`flex-1 ${
-              phase === 'live' && user === 'inspector'
-                ? 'overflow-y-auto md:overflow-hidden'
-                : 'overflow-y-auto'
-            }`}
-          >
-            {user === 'inspector' && phase === 'home' && (
-              <HomeScreen goto={goto} />
-            )}
-            {user === 'inspector' && phase === 'briefing' && (
-              <BriefingScreen goto={goto} />
-            )}
-            {user === 'inspector' && phase === 'live' && (
-              <LiveInspectionScreen
-                goto={goto}
-                alerts={alerts}
-                setAlerts={setAlerts}
-                violations={violations}
-                setViolations={setViolations}
-                captures={captures}
-                setCaptures={setCaptures}
-                danger={danger}
-                setDanger={setDanger}
-                dangerStatus={dangerStatus}
-                setDangerStatus={setDangerStatus}
-                elapsed={elapsed}
-                paused={paused}
-                setPaused={setPaused}
-                stopped={stopped}
-                setStopped={setStopped}
-              />
-            )}
-            {user === 'inspector' && phase === 'review' && (
-              <ViolationReviewScreen
-                goto={goto}
-                docStatuses={docStatuses}
-                setDocStatuses={setDocStatuses}
-                docTexts={docTexts}
-                setDocTexts={setDocTexts}
-              />
-            )}
-            {user === 'inspector' && phase === 'issue' && (
-              <IssuanceScreen
-                goto={goto}
-                delivered={delivered}
-                setDelivered={setDelivered}
-              />
-            )}
-            {user === 'inspector' && phase === 'followup' && (
-              <FollowUpScreen goto={goto} />
-            )}
-            {user === 'inspector' && phase === 'analytics' && (
-              <InspectorAnalyticsScreen />
-            )}
-            {user === 'admin' && phase === 'admin-home' && (
-              <AdminOverview goto={goto} />
-            )}
-            {user === 'admin' && phase === 'approvals' && <AdminApprovals />}
-            {user === 'admin' && phase === 'inspectors' && <AdminInspectors />}
-            {user === 'admin' && phase === 'admin-analytics' && (
-              <AdminAnalytics />
-            )}
-            {phase === 'profile' && <ProfileScreen role={user} />}
-          </main>
+          <div className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
+            {/* Language toggle */}
+            <div className="flex items-center rounded-full border overflow-hidden" style={{ borderColor: 'rgba(161,0,255,0.25)' }}>
+              <button onClick={() => setLanguage('en')} className="inline-flex items-center gap-1 px-2 sm:px-2.5 py-1 sm:py-1.5 text-[10px] sm:text-xs font-bold transition-colors" style={{ background: language === 'en' ? 'linear-gradient(135deg, #A100FF 0%, #460073 100%)' : 'white', color: language === 'en' ? '#fff' : '#460073' }}>
+                <Globe className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
+                EN
+              </button>
+              <button onClick={() => setLanguage('ja')} className="inline-flex items-center gap-1 px-2 sm:px-2.5 py-1 sm:py-1.5 text-[10px] sm:text-xs font-bold transition-colors" style={{ background: language === 'ja' ? 'linear-gradient(135deg, #A100FF 0%, #460073 100%)' : 'white', color: language === 'ja' ? '#fff' : '#460073' }}>
+                日本語
+              </button>
+            </div>
+            <button onClick={handleNewChat} className="inline-flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1 sm:py-1.5 rounded-full border text-[10px] sm:text-xs font-semibold transition-all hover:scale-105" style={{ background: 'white', borderColor: 'rgba(161,0,255,0.25)', color: '#460073' }}>
+              <MessageSquarePlus className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
+              <span className="hidden sm:inline">{tr('newChat')}</span>
+              <span className="sm:hidden">{tr('newChatShort')}</span>
+            </button>
+            <div className="flex items-center gap-1.5 px-2 sm:px-3 py-1 sm:py-1.5 rounded-full border" style={{ background: 'rgba(161,0,255,0.06)', borderColor: 'rgba(161,0,255,0.2)' }}>
+              <Sparkles className="w-3 h-3 sm:w-3.5 sm:h-3.5" style={{ color: '#A100FF' }} />
+              <span className="text-[10px] sm:text-xs font-semibold whitespace-nowrap" style={{ color: '#460073' }}>{tr('pocBadge')}</span>
+            </div>
+          </div>
         </div>
-      </div>
-    </LangCtx.Provider>
+      </header>
+
+      <main className="flex-1 overflow-y-auto">
+        <div className="max-w-4xl mx-auto px-3 sm:px-6 py-4 sm:py-8">
+          {messages.length === 0 && !isGenerating && (
+            <div className="text-center py-8 sm:py-16 px-2">
+              <div className="inline-flex items-center justify-center w-16 h-16 sm:w-20 sm:h-20 rounded-2xl mb-4 sm:mb-6" style={{ background: 'linear-gradient(135deg, #A100FF 0%, #460073 100%)', boxShadow: '0 12px 32px rgba(161,0,255,0.3)' }}>
+                <LSBLogo className="w-8 h-8 sm:w-10 sm:h-10" />
+              </div>
+              <h2 className="text-lg sm:text-2xl font-bold text-slate-900 mb-2 sm:mb-3 tracking-tight">{tr('emptyHeading')}</h2>
+              <p className="text-xs sm:text-base text-slate-600 max-w-lg mx-auto leading-relaxed">
+                {tr('emptyDescription')}
+              </p>
+            </div>
+          )}
+
+          {messages.map((msg, idx) => {
+            if (msg.role === 'user') {
+              return (
+                <div key={idx} className="mb-4 sm:mb-6 flex justify-end">
+                  <div className="max-w-[85%] sm:max-w-3xl rounded-2xl px-4 sm:px-5 py-3 sm:py-3.5 text-white" style={{ background: 'linear-gradient(135deg, #460073 0%, #5C0091 100%)', boxShadow: '0 4px 12px rgba(70,0,115,0.25)' }}>
+                    <div className="text-xs sm:text-sm leading-relaxed whitespace-pre-wrap">{msg.content}</div>
+                  </div>
+                </div>
+              );
+            }
+
+            if (msg.type === 'clarify' && msg.questions) {
+              const state = clarifyAnswers[idx];
+              const submitted = state?.submitted;
+              const allAnswered = msg.questions.every(q => {
+                const a = state?.answers[q.id];
+                if (!a) return false;
+                if (a === 'Other') return !!(state?.otherTexts[q.id]?.trim());
+                return true;
+              });
+              return (
+                <div key={idx} className="mb-4 sm:mb-6">
+                  <div className="rounded-2xl border bg-white overflow-hidden" style={{ borderColor: 'rgba(161,0,255,0.2)', boxShadow: '0 4px 20px rgba(70,0,115,0.06)' }}>
+                    <div className="px-4 sm:px-5 py-2.5 sm:py-3 flex items-center gap-2" style={{ background: 'linear-gradient(135deg, rgba(161,0,255,0.08) 0%, rgba(70,0,115,0.05) 100%)' }}>
+                      <Sparkles className="w-3.5 h-3.5 sm:w-4 sm:h-4" style={{ color: '#A100FF' }} />
+                      <div className="text-xs sm:text-sm font-semibold" style={{ color: '#460073' }}>{tr('clarifyHeading')}</div>
+                    </div>
+                    <div className="p-4 sm:p-5 space-y-4 sm:space-y-5">
+                      {msg.questions.map(q => {
+                        const selected = state?.answers[q.id];
+                        const otherText = state?.otherTexts[q.id] || '';
+                        return (
+                          <div key={q.id}>
+                            <div className="text-xs sm:text-sm font-semibold text-slate-800 mb-2.5 sm:mb-3">{q.question}</div>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                              {q.options.map(opt => {
+                                const active = selected === opt;
+                                return (
+                                  <button key={opt} onClick={() => !submitted && setAnswer(idx, q.id, opt)} disabled={submitted} className="text-left px-3 py-2.5 rounded-lg border text-[11px] sm:text-xs transition-all disabled:cursor-not-allowed" style={{ borderColor: active ? '#A100FF' : 'rgba(161,0,255,0.15)', background: active ? 'rgba(161,0,255,0.08)' : 'white', color: active ? '#460073' : '#334155', fontWeight: active ? 600 : 400, boxShadow: active ? '0 0 0 3px rgba(161,0,255,0.1)' : 'none' }}>
+                                    {opt}
+                                  </button>
+                                );
+                              })}
+                            </div>
+                            {selected === 'Other' && (
+                              <input value={otherText} onChange={(e) => setOtherText(idx, q.id, e.target.value)} disabled={submitted} placeholder={tr('pleaseSpecify')} className="mt-2 w-full px-3 py-2 rounded-lg border text-xs focus:outline-none disabled:bg-slate-50" style={{ borderColor: '#A100FF', color: '#1E293B' }} />
+                            )}
+                          </div>
+                        );
+                      })}
+                      {!submitted && (
+                        <div className="pt-2 flex justify-end">
+                          <button onClick={() => handleClarifySubmit(idx)} disabled={!allAnswered || isGenerating} className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold text-white transition-all disabled:opacity-50 disabled:cursor-not-allowed" style={{ background: 'linear-gradient(135deg, #A100FF 0%, #460073 100%)', boxShadow: '0 4px 12px rgba(161,0,255,0.3)' }}>
+                            <Send className="w-3.5 h-3.5" /> {tr('continueDraft')}
+                          </button>
+                        </div>
+                      )}
+                      {submitted && (<div className="text-xs text-slate-500 italic pt-2">{tr('clarifySubmitted')}</div>)}
+                    </div>
+                  </div>
+                </div>
+              );
+            }
+
+            if (msg.type === 'escalation' && msg.reports) {
+              const r = msg.reports[0];
+              const theme = severityTheme('ESCALATION');
+              return (
+                <div key={idx} className="mb-4 sm:mb-6">
+                  <div className="rounded-2xl border-2 p-4 sm:p-5" style={{ background: theme.bg, borderColor: theme.accent }}>
+                    <div className="flex items-center gap-2 mb-3">
+                      <ShieldCheck className="w-4 h-4 sm:w-5 sm:h-5" style={{ color: theme.accent }} />
+                      <div className="text-xs sm:text-sm font-bold uppercase tracking-wider" style={{ color: theme.text }}>{tr('escalationLabel')}</div>
+                    </div>
+                    <pre className="text-[11px] sm:text-xs leading-relaxed whitespace-pre-wrap font-mono" style={{ color: theme.text }}>{r.rawText}</pre>
+                  </div>
+                </div>
+              );
+            }
+
+            if (msg.type === 'reports' && msg.reports) {
+              const visibleReports = msg.reports.map((r, ri) => ({ r, ri })).filter(({ ri }) => !reportDeleted[`${idx}-${ri}`]);
+              if (visibleReports.length === 0) {
+                return (<div key={idx} className="mb-6 text-center text-xs text-slate-400 italic">{tr('allDeleted')}</div>);
+              }
+              return (
+                <div key={idx} className="mb-4 sm:mb-6">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 text-[11px] sm:text-xs text-slate-500 mb-2 sm:mb-3 px-1">
+                    <span>{visibleReports.length === 1 ? tr('oneDraftGenerated') : tr('nDraftsGenerated', { n: visibleReports.length })}</span>
+                    {msg.generationMs && (
+                      <span className="inline-flex items-center gap-1 self-start sm:self-auto" style={{ color: '#460073' }}>
+                        <Clock className="w-3 h-3" /> {tr('generatedIn')} {formatDuration(msg.generationMs)}
+                      </span>
+                    )}
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5 sm:gap-3">
+                    {visibleReports.map(({ r, ri }) => {
+                      const reportKey = `${idx}-${ri}`;
+                      const approved = reportApproved[reportKey];
+                      const needsV = r.verificationItems.length > 0 && !verificationResolved[reportKey];
+                      const theme = severityTheme(r.severity);
+                      const Icon = theme.icon;
+                      const findingsCount = r.sections[0]?.rows.length ?? 0;
+                      return (
+                        <button key={ri} onClick={() => setDrillDown({ messageIdx: idx, reportIdx: ri })} className="text-left bg-white rounded-xl border overflow-hidden transition-all hover:shadow-lg active:scale-[0.98] relative" style={{ borderColor: 'rgba(161,0,255,0.15)' }}>
+                          {needsV && (
+                            <div className="absolute top-2 right-2 z-10 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-bold text-white" style={{ background: '#A100FF' }}>
+                              <HelpCircle className="w-2.5 h-2.5" /> {tr('confirmPill')}
+                            </div>
+                          )}
+                          <div className="px-4 py-2.5 sm:py-3 flex items-center gap-2" style={{ background: theme.bg, borderBottom: `1px solid ${theme.border}` }}>
+                            <Icon className="w-4 h-4" style={{ color: theme.accent }} />
+                            <div className="text-[10px] font-bold uppercase tracking-wider" style={{ color: theme.text }}>{sevDisplay(r.severity, language)}</div>
+                            {approved && <CheckCircle className="w-3.5 h-3.5 text-emerald-500 ml-auto" />}
+                          </div>
+                          <div className="p-3 sm:p-4">
+                            <div className="text-xs sm:text-sm font-bold text-slate-900 mb-1.5 sm:mb-2 leading-snug">{docTypeDisplay(r.documentType, language)}</div>
+                            <div className="text-[11px] sm:text-xs text-slate-600 line-clamp-2 leading-relaxed mb-2 sm:mb-3">{r.businessName} · {findingsCount} {findingsCount === 1 ? tr('findingCount') : tr('findingCountPlural')}</div>
+                            <div className="flex items-center justify-between text-[10px] sm:text-[11px]">
+                              <span className="text-slate-400 font-mono truncate">{r.documentNumber}</span>
+                              <span style={{ color: '#A100FF' }} className="font-semibold flex-shrink-0 ml-2">{tr('open')}</span>
+                            </div>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            }
+
+            return (
+              <div key={idx} className="mb-4 sm:mb-6">
+                <div className="bg-white border border-slate-200 rounded-2xl px-4 sm:px-5 py-3 sm:py-4 shadow-sm">
+                  <pre className="text-[11px] sm:text-xs leading-relaxed whitespace-pre-wrap font-mono text-slate-700">{msg.content}</pre>
+                </div>
+              </div>
+            );
+          })}
+
+          {isGenerating && (
+            <div className="flex justify-start mb-4 sm:mb-6">
+              <div className="bg-white border border-slate-200 rounded-2xl px-4 sm:px-5 py-3 sm:py-4 shadow-sm">
+                <div className="flex items-center gap-3">
+                  <Loader2 className="w-4 h-4 animate-spin" style={{ color: '#A100FF' }} />
+                  <div className="text-xs sm:text-sm">
+                    <div className="font-semibold text-slate-900">{loaderMessage.title}</div>
+                    <div className="text-[11px] sm:text-xs text-slate-500 mt-0.5">{loaderMessage.sub}</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+          <div ref={messagesEndRef} />
+        </div>
+      </main>
+
+      <footer className="border-t bg-white" style={{ borderColor: 'rgba(161,0,255,0.1)' }}>
+        <div className="max-w-4xl mx-auto px-3 sm:px-6 py-3 sm:py-4">
+          <div className="relative">
+            <textarea value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSubmit(); } }} placeholder={tr('inputPlaceholder')} rows={3} className="w-full px-3 sm:px-4 py-2.5 sm:py-3 pr-12 sm:pr-14 rounded-xl border bg-slate-50/50 text-xs sm:text-sm resize-none transition-all outline-none focus:bg-white" style={{ borderColor: 'rgba(161,0,255,0.18)' }} onFocus={(e) => { e.currentTarget.style.borderColor = '#A100FF'; e.currentTarget.style.boxShadow = '0 0 0 3px rgba(161,0,255,0.1)'; }} onBlur={(e) => { e.currentTarget.style.borderColor = 'rgba(161,0,255,0.18)'; e.currentTarget.style.boxShadow = 'none'; }} disabled={isGenerating} />
+            <button onClick={() => handleSubmit()} disabled={!input.trim() || isGenerating} className="absolute right-2 sm:right-3 bottom-2 sm:bottom-3 p-2 rounded-lg text-white transition-all disabled:opacity-40 disabled:cursor-not-allowed" style={{ background: 'linear-gradient(135deg, #A100FF 0%, #460073 100%)', boxShadow: '0 2px 8px rgba(161,0,255,0.3)' }} aria-label="Send">
+              <Send className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+            </button>
+          </div>
+          <div className="mt-2 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 text-[10px] sm:text-xs text-slate-400">
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-1.5">
+                <AlertCircle className="w-3 h-3 flex-shrink-0" />
+                <span className="truncate">{tr('pocFooterNote')}</span>
+              </div>
+              <div className="hidden sm:flex items-center gap-1 text-slate-500 font-mono">
+                <Clock className="w-3 h-3" />
+                <span>{tr('sessionLabel')}: {formatDuration(sessionElapsed)}</span>
+              </div>
+            </div>
+            <span style={{ color: '#460073' }} className="font-medium">{tr('poweredBy')}</span>
+          </div>
+          {/* Mobile session timer below */}
+          <div className="sm:hidden mt-1 flex items-center gap-1 text-[10px] text-slate-500 font-mono">
+            <Clock className="w-3 h-3" />
+            <span>{tr('sessionLabel')}: {formatDuration(sessionElapsed)}</span>
+          </div>
+        </div>
+      </footer>
+
+      {/* Generation-time popup */}
+      {genTimePopup.show && (
+        <div className="fixed top-20 left-1/2 transform -translate-x-1/2 z-30 max-w-sm bg-white rounded-xl border-2 px-4 py-3 animate-bounce-in" style={{ borderColor: '#A100FF', boxShadow: '0 12px 36px rgba(161,0,255,0.25)' }}>
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: 'linear-gradient(135deg, #A100FF 0%, #460073 100%)' }}>
+              <Clock className="w-4 h-4 text-white" />
+            </div>
+            <div>
+              <div className="text-xs sm:text-sm font-bold text-slate-900">{tr('genPopupTitle', { time: formatDuration(genTimePopup.ms) })}</div>
+              <div className="text-[10px] sm:text-xs text-slate-500 mt-0.5">{tr('genPopupSub')}</div>
+            </div>
+            <button onClick={() => setGenTimePopup({ show: false, ms: 0 })} className="ml-2 p-1 rounded hover:bg-slate-100">
+              <X className="w-3.5 h-3.5 text-slate-400" />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Download success toast */}
+      {downloadToast.show && (
+        <div className="fixed bottom-4 left-4 right-4 sm:left-auto sm:right-6 sm:max-w-sm bg-white border rounded-xl p-3 sm:p-4 animate-bounce-in" style={{ borderColor: 'rgba(161,0,255,0.25)', boxShadow: '0 10px 40px rgba(70,0,115,0.15)' }}>
+          <div className="flex items-start gap-3">
+            <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: 'linear-gradient(135deg, #A100FF 0%, #460073 100%)' }}>
+              <CheckCircle className="w-4 h-4 text-white" />
+            </div>
+            <div className="min-w-0">
+              <div className="text-xs sm:text-sm font-semibold text-slate-900">{tr('downloadedTitle')}</div>
+              <div className="text-[11px] sm:text-xs text-slate-600 mt-0.5 truncate">{tr('downloadedSub', { name: downloadToast.reportName })}</div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <style>{`
+        @keyframes bounce-in {
+          0% { opacity: 0; transform: translate(-50%, -20px) scale(0.95); }
+          60% { opacity: 1; transform: translate(-50%, 4px) scale(1.02); }
+          100% { transform: translate(-50%, 0) scale(1); }
+        }
+        .animate-bounce-in { animation: bounce-in 0.4s cubic-bezier(0.4, 0, 0.2, 1); }
+      `}</style>
+    </div>
   );
 }
+
